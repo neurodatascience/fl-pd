@@ -1,0 +1,12 @@
+# Python
+__pycache__
+
+# IDE
+.vscode
+
+# data
+data
+results*
+
+# environment
+.env
