@@ -1,4 +1,6 @@
 click
+dotenv
+ipykernel
 matplotlib
 numpy
 pandas
@@ -6,4 +8,3 @@ scikit-learn
 scipy
 seaborn
 skrub
-
