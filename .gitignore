@@ -10,3 +10,7 @@ results*
 
 # environment
 .env
+
+# Fed-BioMed
+node*
+researcher

@@ -1,5 +1,6 @@
 click
-dotenv
+python-dotenv
+fedbiomed[node,researcher]
 ipykernel
 matplotlib
 numpy
