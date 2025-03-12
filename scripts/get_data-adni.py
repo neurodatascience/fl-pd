@@ -6,7 +6,12 @@ import click
 import numpy as np
 import pandas as pd
 
-from utils import fs6_to_fs7, fs7_aparc_to_keep, fs7_aseg_to_keep
+from utils import (
+    CLICK_CONTEXT_SETTINGS,
+    fs6_to_fs7,
+    fs7_aparc_to_keep,
+    fs7_aseg_to_keep,
+)
 
 
 def get_df_pheno(
@@ -163,7 +168,7 @@ def get_df_adni(
     return df_merged
 
 
-@click.command(context_settings=dict(help_option_names=["-h", "--help"]))
+@click.command(context_settings=CLICK_CONTEXT_SETTINGS)
 @click.argument(
     "fpath_pheno",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
@@ -215,9 +220,8 @@ def get_data_adni(
     if include_aseg:
         fname_data_out_components.append("aseg")
     dpath_out.mkdir(exist_ok=True)
-    fpath_data_out = (dpath_out / "-".join(fname_data_out_components)).with_suffix(
-        ".tsv"
-    )
+    tags = "-".join(fname_data_out_components)
+    fpath_data_out = (dpath_out / tags / tags).with_suffix(".tsv")
 
     df_adni = get_df_adni(
         fpath_pheno=fpath_pheno,
@@ -232,6 +236,8 @@ def get_data_adni(
     )
     if df_adni.empty:
         raise ValueError("Empty dataset")
+
+    fpath_data_out.parent.mkdir(exist_ok=True, parents=True)
     df_adni.to_csv(fpath_data_out, sep="\t")
     print(f"Saved final dataframe of shape {df_adni.shape} to {fpath_data_out}")
 

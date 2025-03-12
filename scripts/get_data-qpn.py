@@ -6,7 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 
-from utils import fs7_aparc_to_keep, fs7_aseg_to_keep
+from utils import CLICK_CONTEXT_SETTINGS, fs7_aparc_to_keep, fs7_aseg_to_keep
 
 VISIT_IDS_ORDERED = [
     "legacy-moca",
@@ -166,7 +166,7 @@ def get_df_qpn(
     return df_merged
 
 
-@click.command(context_settings=dict(help_option_names=["-h", "--help"]))
+@click.command(context_settings=CLICK_CONTEXT_SETTINGS)
 @click.argument(
     "fpath_demographics",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
@@ -236,9 +236,8 @@ def get_data_qpn(
         fname_data_out_components.append("aseg")
 
     dpath_out.mkdir(exist_ok=True)
-    fpath_data_out = (dpath_out / "-".join(fname_data_out_components)).with_suffix(
-        ".tsv"
-    )
+    tags = "-".join(fname_data_out_components)
+    fpath_data_out = (dpath_out / tags / tags).with_suffix(".tsv")
 
     df_qpn = get_df_qpn(
         fpath_demographics=fpath_demographics,
@@ -256,6 +255,7 @@ def get_data_qpn(
     )
     if df_qpn.empty:
         raise ValueError("Empty dataset")
+    fpath_data_out.parent.mkdir(exist_ok=True, parents=True)
     df_qpn.to_csv(fpath_data_out, sep="\t")
     print(f"Saved final dataframe of shape {df_qpn.shape} to {fpath_data_out}")
 
