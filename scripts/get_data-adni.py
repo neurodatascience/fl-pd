@@ -97,41 +97,6 @@ def get_df_pheno(
 
     return df_pheno
 
-    # df_pheno = pd.read_csv(fpath_pheno)
-
-    # df_pheno["participant_id"] = df_pheno["PTID"].apply(
-    #     lambda x: "sub-ADNI" + x.replace("_", "")
-    # )
-    # df_pheno = df_pheno.set_index("participant_id")
-
-    # # use PPMI coding for sex
-    # df_pheno["SEX"] = (
-    #     df_pheno["PTGENDER"].map({"Male": 1, "Female": 0}).astype("category")
-    # )
-
-    # # determine cognitive decline status
-    # traj_info = df_pheno["traj"]  # more than one value per participant
-    # # keep only constant/duplicated values
-    # df_pheno = (
-    #     df_pheno[["AGE", "SEX", "DX_bl", "BL_score"]]
-    #     .reset_index()
-    #     .drop_duplicates()
-    #     .set_index("participant_id")
-    # )
-    # for participant_id in traj_info.index.unique():
-    #     traj_values = traj_info.loc[participant_id]
-    #     df_pheno.loc[participant_id, "COG_DECLINE"] = (traj_values == "decline").any()
-
-    # if not include_controls:
-    #     df_pheno = df_pheno.query("DX_bl != 'CN'")
-    # if not include_cases:
-    #     df_pheno = df_pheno.query("DX_bl == 'CN'")
-
-    # df_pheno = df_pheno[cols]
-    # print(f"Keeping phenotypic columns: {cols}")
-
-    # return df_pheno
-
 
 def get_df_imaging(
     fpath_imaging,
@@ -161,34 +126,6 @@ def get_df_imaging(
     df_imaging = df_imaging.query('session_id == "bl"').reset_index(
         "session_id", drop=True
     )
-
-    return df_imaging
-
-    # df_aparc = pd.read_csv(fpath_aparc, index_col=0)
-    # df_aparc["participant_id"] = df_aparc["subject_id"].str.replace("sub-", "")
-    # df_aparc = df_aparc.set_index("participant_id").drop(columns=["subject_id"])
-
-    # df_aparc_mapping = pd.read_csv(fpath_aparc_mapping, dtype=str).set_index("Field ID")
-    # df_aparc_mapping["target"] = (
-    #     df_aparc_mapping["hemi"] + "_" + df_aparc_mapping["roi"] + "_" + "thickness"
-    # )
-    # df_aparc = df_aparc.rename(columns=df_aparc_mapping["target"].to_dict())
-
-    # df_aseg = pd.read_csv(fpath_aseg, index_col=0)
-    # df_aseg["participant_id"] = df_aseg["subject_id"].str.replace("sub-", "")
-    # df_aseg = df_aseg.set_index("participant_id").drop(columns=["subject_id"])
-
-    # df_mapping_aseg = pd.read_csv(fpath_aseg_mapping, dtype=str).set_index("Field ID")
-    # df_aseg = df_aseg.rename(columns=df_mapping_aseg["hemi_ROI"].to_dict())
-    # # df_aseg = adni_aseg_to_keep(df_aseg)
-
-    # dfs = []
-    # if include_aparc:
-    #     dfs.append(df_aparc)
-    # if include_aseg:
-    #     dfs.append(df_aseg)
-
-    # df_imaging = pd.concat(dfs, axis="columns")
 
     return df_imaging
 

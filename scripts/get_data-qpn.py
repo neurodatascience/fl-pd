@@ -128,26 +128,6 @@ def get_df_imaging(fpath_imaging, include_aparc=True, include_aseg=False):
 
     return df_imaging
 
-    # df_aparc = pd.read_csv(fpath_aparc).set_index("participant_id")
-    # df_aparc.index = df_aparc.index.str.replace("sub-", "")
-    # df_aparc.columns = pd.Series(df_aparc.columns).apply(
-    #     lambda x: x.replace(".", "_") + "_thickness"
-    # )
-    # df_aparc = qpn_to_adni(df_aparc)
-
-    # df_aseg = pd.read_csv(fpath_aseg).set_index("participant_id")
-    # df_aseg.index = df_aseg.index.str.replace("sub-", "")
-    # df_aseg = adni_aseg_to_keep(qpn_to_adni(df_aseg))
-
-    # dfs = []
-    # if include_aparc:
-    #     dfs.append(df_aparc)
-    # if include_aseg:
-    #     dfs.append(df_aseg)
-
-    # df_imaging = pd.concat(dfs, axis="columns")
-    # return df_imaging
-
 
 def get_df_qpn(
     fpath_demographics,

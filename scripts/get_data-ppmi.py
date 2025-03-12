@@ -59,16 +59,6 @@ def get_df_pheno(
     if not include_cases:
         df_pheno = df_pheno.query('COHORT_DEFINITION == "Healthy Control"')
 
-    # # compute age at onset
-    # df_pheno["AGE_AT_ONSET"] = (
-    #     df_pheno["DATE_OF_DIAGNOSIS"] - df_pheno["DATE_OF_BIRTH"]
-    # ).dt.days / 365.25
-
-    # # compute disease duration
-    # df_pheno["DISEASE_DURATION"] = np.maximum(
-    #     0, df_pheno["AGE"] - df_pheno["AGE_AT_ONSET"]
-    # )
-
     # determine cognitive decline
     # criterion: drop of >4 from first visit to any of the follow-ups
     data_for_df_moca_diff = []
