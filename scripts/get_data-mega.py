@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 import pandas as pd
 
-from utils import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)

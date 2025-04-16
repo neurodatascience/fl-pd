@@ -6,7 +6,8 @@ import click
 import numpy as np
 import pandas as pd
 
-from utils import CLICK_CONTEXT_SETTINGS, fs7_aparc_to_keep, fs7_aseg_to_keep
+from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.freesurfer import fs7_aparc_to_keep, fs7_aseg_to_keep
 
 VISIT_IDS_ORDERED = [
     "legacy-moca",
@@ -205,12 +206,12 @@ def get_df_qpn(
 @click.option("--aparc/--no-aparc", "include_aparc", default=True)
 @click.option("--aseg/--no-aseg", "include_aseg", default=False)
 def get_data_qpn(
-    fpath_demographics,
-    fpath_age,
-    fpath_diagnosis,
-    fpath_moca,
-    fpath_imaging,
-    dpath_out,
+    fpath_demographics: Path,
+    fpath_age: Path,
+    fpath_diagnosis: Path,
+    fpath_moca: Path,
+    fpath_imaging: Path,
+    dpath_out: Path,
     include_decline=True,
     include_age=True,
     include_sex=False,

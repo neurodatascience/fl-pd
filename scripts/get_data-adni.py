@@ -6,8 +6,8 @@ import click
 import numpy as np
 import pandas as pd
 
-from utils import (
-    CLICK_CONTEXT_SETTINGS,
+from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.freesurfer import (
     fs6_to_fs7,
     fs7_aparc_to_keep,
     fs7_aseg_to_keep,
@@ -192,9 +192,9 @@ def get_df_adni(
 @click.option("--aparc/--no-aparc", "include_aparc", default=True)
 @click.option("--aseg/--no-aseg", "include_aseg", default=False)
 def get_data_adni(
-    fpath_pheno,
-    fpath_imaging,
-    dpath_out,
+    fpath_pheno: Path,
+    fpath_imaging: Path,
+    dpath_out: Path,
     include_decline=True,
     include_age=True,
     include_sex=False,

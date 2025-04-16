@@ -1,6 +1,3 @@
-CLICK_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"], "show_default": True}
-
-
 def fs6_to_fs7(df_fs6):
 
     df_fs6 = df_fs6.drop(

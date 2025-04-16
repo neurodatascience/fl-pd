@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
-from utils import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
@@ -44,7 +44,7 @@ from utils import CLICK_CONTEXT_SETTINGS
     help="Random state for reproducibility",
 )
 def split_train_test(
-    dpath_data, tags: list[str], n_splits, stratify_col, shuffle, random_state
+    dpath_data: Path, tags: list[str], n_splits, stratify_col, shuffle, random_state
 ):
 
     for tag in tags:
@@ -52,7 +52,7 @@ def split_train_test(
 
         fpath_data = dpath_data / tag / f"{tag}.tsv"
 
-        df = pd.read_csv(fpath_data, sep="\t")
+        df: pd.DataFrame = pd.read_csv(fpath_data, sep="\t")
         print(f"Full dataframe shape: {df.shape}")
 
         if stratify_col == "DECLINE":
@@ -71,8 +71,8 @@ def split_train_test(
             cv_splitter.split(X=df, y=stratify),
         ):
             print(f"Split {i_split}")
-            df_train = df.iloc[idx_train]
-            df_test = df.iloc[idx_test]
+            df_train: pd.DataFrame = df.iloc[idx_train]
+            df_test: pd.DataFrame = df.iloc[idx_test]
 
             fpath_train = fpath_data.with_name(f"{fpath_data.stem}-{i_split}train.tsv")
             fpath_test = fpath_data.with_name(f"{fpath_data.stem}-{i_split}test.tsv")
