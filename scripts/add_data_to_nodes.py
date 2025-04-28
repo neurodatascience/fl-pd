@@ -1,0 +1,140 @@
+#!/usr/bin/env python
+from enum import Enum
+from pathlib import Path
+from typing import Tuple
+import configparser
+import re
+import json
+import subprocess
+import tempfile
+import warnings
+
+import click
+import pandas as pd
+
+DATASET_NAMES = ("adni", "ppmi", "qpn")
+
+
+class MlTarget(str, Enum):
+    COG_DECLINE = "cog_decline"
+    BRAIN_AGE = "brain_age"
+
+
+NODE_MAP = {
+    "mega": "node-mega",
+    "adni": "node-adni",
+    "ppmi": "node-ppmi",
+    "qpn": "node-qpn",
+}
+
+ML_TARGET_MAP = {
+    "decline-age-case-aparc": MlTarget.COG_DECLINE,
+    "age-sex-hc-aseg": MlTarget.BRAIN_AGE,
+}
+
+
+def _get_dataset_name(fname) -> str:
+    for dataset_name in ("mega",) + DATASET_NAMES:
+        if dataset_name in fname:
+            return dataset_name
+    raise ValueError(f"No dataset name found for {fname=}")
+
+
+def _get_ml_target(fname) -> MlTarget:
+    for substring, ml_target in ML_TARGET_MAP.items():
+        if substring in fname:
+            return ml_target
+    raise ValueError(f"No ML target found for {fname=}")
+
+
+def _get_i_train(fname) -> int:
+    if (match := re.search("(\d+)train", fname)) is not None:
+        groups = match.groups()
+        if len(groups) == 1:
+            return int(groups[0])
+    raise ValueError(f"No i_train found for {fname=}")
+
+
+def _get_data_info(fname) -> Tuple[str, MlTarget, int]:
+    return (_get_dataset_name(fname), _get_ml_target(fname), _get_i_train(fname))
+
+
+def _get_tags(dataset_name: str, ml_target: MlTarget, i_train: int) -> str:
+    tags = []
+    if dataset_name != "mega":
+        tags.append("federated")
+    tags.extend([dataset_name, ml_target.value, f"{i_train}train"])
+    return ",".join(tags)
+
+
+def _data_already_added(dpath_node: Path, fpath_tsv: Path) -> bool:
+    fpath_config = dpath_node / "etc" / "config.ini"
+    if not fpath_config.exists():
+        raise FileNotFoundError(f"Node config file not found: {fpath_config}")
+
+    config = configparser.ConfigParser()
+    config.read(str(fpath_config))
+    fpath_db = (fpath_config.parent / config["default"]["db"]).resolve()
+    if not fpath_db.exists():
+        warnings.warn(f"Node database file not found: {fpath_db}")
+        return False
+
+    db_json = json.loads(fpath_db.read_text())
+    df_datasets = pd.DataFrame(db_json["Datasets"]).T
+
+    return str(fpath_tsv) in df_datasets["path"].to_list()
+
+
+def _add_data_to_node(fpath_tsv: Path, dpath_nodes: Path):
+    dataset_name, ml_target, i_train = _get_data_info(fpath_tsv.name)
+    dpath_node = dpath_nodes / f"node-{dataset_name}"
+
+    if _data_already_added(dpath_node, fpath_tsv):
+        print(f"{fpath_tsv.name} is already in node {dpath_node.name}. Skipping")
+        return
+
+    dataset_info = {
+        "path": str(fpath_tsv),
+        "data_type": "csv",
+        "description": "",
+        "tags": _get_tags(dataset_name, ml_target, i_train),
+        "name": f"{dataset_name.upper()} {ml_target.value} (train {i_train})",
+    }
+    with tempfile.NamedTemporaryFile(mode="+wt") as file_json:
+        file_json.write(json.dumps(dataset_info))
+        file_json.flush()
+        subprocess.run(
+            [
+                "fedbiomed",
+                "node",
+                "-p",
+                str(dpath_node),
+                "dataset",
+                "add",
+                "--file",
+                file_json.name,
+            ],
+            check=True,
+        )
+
+
+@click.command()
+@click.argument(
+    "dpath_data",
+    type=click.Path(path_type=Path, exists=True, file_okay=False),
+    envvar="DPATH_FL_DATA",
+)
+@click.argument(
+    "dpath_nodes",
+    type=click.Path(path_type=Path, exists=True, file_okay=False),
+    envvar="DPATH_FEDBIOMED",
+)
+def add_data_to_nodes(dpath_data: Path, dpath_nodes: Path):
+    fpaths_tsv = dpath_data.glob("**/*train*.tsv")
+    for fpath_tsv in sorted(fpaths_tsv):
+        print(f"----- {fpath_tsv} -----")
+        _add_data_to_node(fpath_tsv, dpath_nodes)
+
+
+if __name__ == "__main__":
+    add_data_to_nodes()
