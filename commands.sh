@@ -22,3 +22,18 @@ source .env
 # combine for mega-analysis case
 parallel ./scripts/get_data-mega.py --tag decline-age-case-aparc --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA adni ppmi qpn ::: {0..9}
 parallel ./scripts/get_data-mega.py --tag age-sex-hc-aseg --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA adni ppmi qpn ::: {0..9}
+
+# create the nodes
+fedbiomed component create -p ./fedbiomed/node-mega -c NODE
+fedbiomed component create -p ./fedbiomed/node-adni -c NODE
+fedbiomed component create -p ./fedbiomed/node-ppmi -c NODE
+fedbiomed component create -p ./fedbiomed/node-qpn -c NODE
+
+# add data to nodes
+./scripts/add_data_to_nodes.py $DPATH_FL_DATA $DPATH_FEDBIOMED
+
+# start the nodes (in different terminal windows)
+fedbiomed node -p ./fedbiomed/node-mega start
+fedbiomed node -p ./fedbiomed/node-adni start
+fedbiomed node -p ./fedbiomed/node-ppmi start
+fedbiomed node -p ./fedbiomed/node-qpn start
