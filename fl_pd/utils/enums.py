@@ -9,6 +9,11 @@ class MlSetup(str, enum.Enum):
     MEGA = "mega"
 
 
-class MlProblemType(str, enum.Enum):
+class MlProblem(str, enum.Enum):
     CLASSIFICATION = "classification"
     REGRESSION = "regression"
+
+
+class MlFramework(str, enum.Enum):
+    SKLEARN = "sklearn"
+    PYTORCH = "pytorch"
