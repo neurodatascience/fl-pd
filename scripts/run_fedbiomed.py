@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 
 import datetime
+import json
+import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import click
 import pandas as pd
+from yaml import load, Loader
+
 from fedbiomed.researcher.federated_workflows import Experiment
 from fedbiomed.researcher.aggregators.fedavg import FedAverage
 
@@ -15,20 +19,16 @@ from fl_pd.metrics import get_metrics_map
 from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
 from fl_pd.utils.enums import MlProblem, MlSetup, MlFramework
 
+DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
+DEFAULT_MIN_AGE = 55
 DEFAULT_DATASETS = ("adni", "ppmi", "qpn")
+DEFAULT_N_SPLITS = 1
+DEFAULT_SGDC_LOSS = "log_loss"
+DEFAULT_SGDR_LOSS = "squared_error"
 
-# TODO move to config file?
-FEDBIOMED_ROUNDS = 1
-TRAINING_ARGS = {
-    "epochs": 100,
-    "loader_args": {
-        "batch_size": 128,
-    },
-    # "epochs": 1,
-    # "loader_args": {
-    #     "batch_size": 10000,
-    # },
-}
+
+class KnownError(Exception):
+    pass
 
 
 class FedbiomedWorkflow:
@@ -37,24 +37,34 @@ class FedbiomedWorkflow:
         dpath_data: Path,
         dpath_results: Path,
         dpath_researcher: Path,
-        setups: Iterable[MlSetup],
+        fpath_config: Path,
         problem: MlProblem,
         framework: MlFramework,
-        min_age: int,
-        test_datasets: Iterable[str],
-        n_splits: int,
-        random_state: int,
+        setups: Iterable[MlSetup] = DEFAULT_SETUPS,
+        min_age: int = DEFAULT_MIN_AGE,
+        sgdc_loss: str = DEFAULT_SGDC_LOSS,
+        sgdr_loss: str = DEFAULT_SGDR_LOSS,
+        test_datasets: Iterable[str] = DEFAULT_DATASETS,
+        n_splits: int = DEFAULT_N_SPLITS,
+        random_state: Optional[int] = None,
+        sloppy: bool = False,
+        overwrite: bool = False,
     ):
-        self.dpath_data = dpath_data
-        self.dpath_results = dpath_results
-        self.dpath_researcher = dpath_researcher
+        self.dpath_data = Path(dpath_data)
+        self.dpath_results = Path(dpath_results)
+        self.dpath_researcher = Path(dpath_researcher)
+        self.fpath_config = Path(fpath_config)
         self.setups = setups
         self.problem = problem
         self.framework = framework
         self.min_age = min_age
+        self.sgdc_loss = sgdc_loss
+        self.sgdr_loss = sgdr_loss
         self.test_datasets = test_datasets
         self.n_splits = n_splits
         self.random_state = random_state
+        self.sloppy = sloppy
+        self.overwrite = overwrite
 
         fedbiomed_tags = []
         if self.problem == MlProblem.CLASSIFICATION:
@@ -69,7 +79,29 @@ class FedbiomedWorkflow:
         self.data_tags = data_tags
         self.fedbiomed_tags = fedbiomed_tags
 
-        self.config = deepcopy(locals())
+        if not self.fpath_config.exists():
+            raise KnownError(f"Config file not found: {self.fpath_config}")
+        fbm_configs = load(self.fpath_config.read_text(), Loader)
+        self.fbm_configs = fbm_configs
+
+        self.settings = deepcopy(locals())
+        self.settings.pop("self")
+        for key in ("dpath_data", "dpath_results", "dpath_researcher", "fpath_config"):
+            self.settings[key] = str(self.settings[key])
+        self.settings["model_args"] = self.get_model_args(None, None)
+
+        framework_tags = f"{self.framework.value}-{self.problem.value}"
+        if self.framework == MlFramework.SKLEARN:
+            if self.problem == MlProblem.CLASSIFICATION:
+                framework_tags += f"-{self.sgdc_loss}"
+            elif self.problem == MlProblem.REGRESSION:
+                framework_tags += f"-{self.sgdr_loss}"
+        dpath_run_results = (
+            self.dpath_results
+            / datetime.datetime.now().strftime("%Y_%m_%d")
+            / f"{framework_tags}-{self.data_tags}-{self.min_age}-{self.random_state}"
+        )
+        self.dpath_run_results = dpath_run_results
 
     def get_test_data(self, i_split: int, setup: MlSetup):
         Xy_test_all = {}
@@ -115,6 +147,10 @@ class FedbiomedWorkflow:
         }
         if self.problem == MlProblem.CLASSIFICATION:
             model_args["n_classes"] = 2
+            loss = self.sgdc_loss
+        elif self.problem == MlProblem.REGRESSION:
+            loss = self.sgdr_loss
+        model_args["loss"] = loss
         return model_args
 
     def get_training_plan(self):
@@ -127,7 +163,7 @@ class FedbiomedWorkflow:
                 from fl_pd.training_plans.sklearn import SklearnRegressorTrainingPlan
                 return SklearnRegressorTrainingPlan
         # fmt: on
-        raise ValueError(
+        raise KnownError(
             f"No training plan found for: {self.problem=}, {self.framework=}"
         )
 
@@ -142,17 +178,21 @@ class FedbiomedWorkflow:
             i_split=i_split, setup=setup
         )
 
+        fbm_training_config = self.fbm_configs[
+            setup.value if not self.sloppy else "fast"
+        ]
+
         # Fed-BioMed experiment
         experiment = Experiment(
             nodes=nodes,
             tags=self.fedbiomed_tags + [f"{i_split}train"],
             training_plan_class=self.get_training_plan(),
             model_args=self.get_model_args(n_features, n_targets),
-            training_args=TRAINING_ARGS,
-            round_limit=FEDBIOMED_ROUNDS,
+            round_limit=fbm_training_config["rounds"],
+            training_args=fbm_training_config["training_args"],
             aggregator=FedAverage(),
             node_selection_strategy=None,
-            config_path=self.dpath_researcher,
+            # config_path=self.dpath_researcher,  # seems to be causing auth problems
         )
         try:
             experiment.run()
@@ -161,7 +201,7 @@ class FedbiomedWorkflow:
 
         # get final model
         experiment.training_plan().set_model_params(
-            experiment.aggregated_params()[FEDBIOMED_ROUNDS - 1]["params"]
+            experiment.aggregated_params()[fbm_training_config["rounds"] - 1]["params"]
         )
         model = experiment.training_plan().model()
 
@@ -190,6 +230,24 @@ class FedbiomedWorkflow:
         return data_results
 
     def run(self):
+        # results paths
+        fname_base_metrics = f"metrics-{self.n_splits}_splits"
+        fname_base_settings = f"settings-{self.n_splits}_splits"
+        if self.sloppy:
+            fname_base_metrics += "-sloppy"
+            fname_base_settings += "-sloppy"
+        fpath_metrics = self.dpath_run_results / f"{fname_base_metrics}.tsv"
+        fpath_settings = self.dpath_run_results / f"{fname_base_settings}.json"
+
+        # save settings
+        self.dpath_run_results.mkdir(parents=True, exist_ok=True)
+        if fpath_settings.exists() and not self.overwrite:
+            raise KnownError(
+                f"Settings file already exists: {fpath_settings}. "
+                "Use --overwrite to overwrite."
+            )
+        fpath_settings.write_text(json.dumps(self.settings, indent=4))
+
         data_results = []
         for setup in self.setups:
             for i_split in range(self.n_splits):
@@ -220,19 +278,11 @@ class FedbiomedWorkflow:
                         )
                     )
 
-        df_results = pd.DataFrame(data_results)
-        fpath_out = (
-            self.dpath_results
-            / self.framework.value
-            / datetime.datetime.now().strftime("%Y_%m_%d")
-            / f"results-{self.problem.value}-{self.data_tags}-{self.min_age}-{self.n_splits}-{self.random_state}.tsv"
-        )
-        fpath_out.parent.mkdir(parents=True, exist_ok=True)
-        if len(df_results) > 0:
-            df_results.to_csv(fpath_out, sep="\t", index=False)
-            print(f"Results saved to {fpath_out}")
-
-        # TODO save config (model args, training args, number of rounds, etc.)
+                # save the results as they are being obtained
+                df_results = pd.DataFrame(data_results)
+                if len(df_results) > 0:
+                    df_results.to_csv(fpath_metrics, sep="\t", index=False)
+                    print(f"Results saved to {fpath_metrics}")
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
@@ -251,12 +301,17 @@ class FedbiomedWorkflow:
     type=click.Path(path_type=Path, file_okay=False),
     envvar="DPATH_FEDBIOMED_RESEARCHER",
 )
+@click.argument(
+    "fpath_config",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    envvar="FPATH_FEDBIOMED_CONFIG",
+)
 @click.option(
     "--setup",
     "setups",
     type=click.Choice(MlSetup, case_sensitive=False),
     multiple=True,
-    default=[setup for setup in MlSetup],
+    default=DEFAULT_SETUPS,
 )
 @click.option(
     "--problem",
@@ -268,14 +323,26 @@ class FedbiomedWorkflow:
     type=click.Choice(MlFramework, case_sensitive=False),
     required=True,
 )
-@click.option("--min-age", type=int, default=55)
+@click.option("--min-age", type=int, default=DEFAULT_MIN_AGE)
+@click.option(
+    "--sgdc-loss",
+    type=str,
+    default=DEFAULT_SGDC_LOSS,
+    help="Loss for Sklearn SGDClassifier",
+)
+@click.option(
+    "--sgdr-loss",
+    type=str,
+    default=DEFAULT_SGDR_LOSS,
+    help="Loss for Sklearn SGDRegressor",
+)
 @click.option(
     "--dataset",
     "test_datasets",
     type=str,
     multiple=True,
     default=DEFAULT_DATASETS,
-    help="Dataset to use for testing (train datasets determined by active nodes).",
+    help="Dataset to use for testing (train datasets determined by active nodes and MlSetup).",
 )
 @click.option("--n-splits", type=click.IntRange(min=1), default=1)
 @click.option(
@@ -284,10 +351,18 @@ class FedbiomedWorkflow:
     envvar="RANDOM_SEED",
     help="Random state for reproducibility",
 )
+@click.option(
+    "--sloppy", is_flag=True, help="Run Fed-BioMed as fast as possible (for testing)"
+)
+@click.option("--overwrite", is_flag=True, help="Overwrite existing results files")
 def run_fedbiomed(**params):
     workflow = FedbiomedWorkflow(**params)
     workflow.run()
 
 
 if __name__ == "__main__":
-    run_fedbiomed()
+    try:
+        run_fedbiomed()
+    except KnownError as exception:
+        click.echo(click.style(f"ERROR: {exception}", fg="red", bold=True))
+        sys.exit(1)

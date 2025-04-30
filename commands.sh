@@ -3,7 +3,7 @@
 
 # source the environment variables (paths)
 set -a
-source .env
+source config/.env
 
 # classification (cognitive decline)
 ./scripts/get_data-adni.py --decline --age --no-sex --cases --no-controls --aparc --no-aseg $FPATH_ADNI_PHENO $FPATH_ADNI_IMAGING $DPATH_FL_DATA
@@ -37,3 +37,7 @@ fedbiomed node -p ./fedbiomed/node-mega start
 fedbiomed node -p ./fedbiomed/node-adni start
 fedbiomed node -p ./fedbiomed/node-ppmi start
 fedbiomed node -p ./fedbiomed/node-qpn start
+
+# run Fed-BioMed
+./scripts/run_fedbiomed.py --problem classification --sgdc-loss log_loss --framework sklearn --n-splits 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED_RESEARCHER $FPATH_FEDBIOMED_CONFIG
+./scripts/run_fedbiomed.py --problem regression --framework sklearn --n-splits 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED_RESEARCHER $FPATH_FEDBIOMED_CONFIG
