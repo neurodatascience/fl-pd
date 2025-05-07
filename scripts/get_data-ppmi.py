@@ -21,6 +21,7 @@ def get_df_pheno(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
 ):
@@ -32,6 +33,8 @@ def get_df_pheno(
         cols.append("AGE")
     if include_sex:
         cols.append("SEX")
+    if include_diag:
+        cols.append("DIAGNOSIS")
 
     # load
     df_pheno = pd.read_csv(
@@ -46,6 +49,14 @@ def get_df_pheno(
         key=lambda x: x.map(
             lambda y: VISIT_IDS_ORDERED.index(y) if y in VISIT_IDS_ORDERED else y
         )
+    )
+
+    # recode diagnosis
+    # NOTE for diagnosis we consider prodromal to be non-PD
+    df_pheno["DIAGNOSIS"] = (
+        df_pheno["COHORT_DEFINITION"]
+        .map({"Healthy Control": 0, "Parkinson's Disease": 1, "Prodromal": 0})
+        .astype("category")
     )
 
     # convert to datetime
@@ -152,6 +163,7 @@ def get_df_ppmi(
     include_sex=False,
     include_cases=True,
     include_controls=False,
+    include_diag=False,
     include_aparc=True,
     include_aseg=False,
     is_fs6=False,
@@ -163,6 +175,7 @@ def get_df_ppmi(
         include_sex=include_sex,
         include_cases=include_cases,
         include_controls=include_controls,
+        include_diag=include_diag,
     )
     df_imaging = get_df_imaging(
         fpath_imaging,
@@ -207,6 +220,7 @@ def get_df_ppmi(
 @click.option("--decline/--no-decline", "include_decline", default=True)
 @click.option("--age/--no-age", "include_age", default=True)
 @click.option("--sex/--no-sex", "include_sex", default=False)
+@click.option("--diag/--no-diag", "include_diag", default=False)
 @click.option("--cases/--no-cases", "include_cases", default=True)
 @click.option("--controls/--no-controls", "include_controls", default=False)
 @click.option("--aparc/--no-aparc", "include_aparc", default=True)
@@ -225,6 +239,7 @@ def get_data_ppmi(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
     include_aparc=True,
@@ -243,6 +258,8 @@ def get_data_ppmi(
         fname_data_out_components.append("age")
     if include_sex:
         fname_data_out_components.append("sex")
+    if include_diag:
+        fname_data_out_components.append("diag")
     if include_cases:
         fname_data_out_components.append("case")
     if include_controls:
@@ -266,6 +283,7 @@ def get_data_ppmi(
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
+        include_diag=include_diag,
         include_cases=include_cases,
         include_controls=include_controls,
         include_aparc=include_aparc,

@@ -17,7 +17,13 @@ from fedbiomed.researcher.aggregators.fedavg import FedAverage
 from fl_pd.io import load_Xy
 from fl_pd.metrics import get_metrics_map
 from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
-from fl_pd.utils.enums import MlProblem, MlSetup, MlFramework
+from fl_pd.utils.constants import (
+    MlProblem,
+    MlSetup,
+    MlFramework,
+    ML_PROBLEM_MAP,
+    ML_TARGET_MAP,
+)
 
 DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
 DEFAULT_MIN_AGE = 55
@@ -38,7 +44,7 @@ class FedbiomedWorkflow:
         dpath_results: Path,
         dpath_researcher: Path,
         fpath_config: Path,
-        problem: MlProblem,
+        data_tags: str,
         framework: MlFramework,
         setups: Iterable[MlSetup] = DEFAULT_SETUPS,
         min_age: int = DEFAULT_MIN_AGE,
@@ -54,8 +60,8 @@ class FedbiomedWorkflow:
         self.dpath_results = Path(dpath_results)
         self.dpath_researcher = Path(dpath_researcher)
         self.fpath_config = Path(fpath_config)
+        self.data_tags = data_tags
         self.setups = setups
-        self.problem = problem
         self.framework = framework
         self.min_age = min_age
         self.sgdc_loss = sgdc_loss
@@ -66,17 +72,13 @@ class FedbiomedWorkflow:
         self.sloppy = sloppy
         self.overwrite = overwrite
 
-        fedbiomed_tags = []
-        if self.problem == MlProblem.CLASSIFICATION:
-            target_cols = ["COG_DECLINE"]
-            data_tags = "decline-age-case-aparc"
-            fedbiomed_tags.append("cog_decline")
-        elif self.problem == MlProblem.REGRESSION:
-            target_cols = ["AGE"]
-            data_tags = "age-sex-hc-aseg"
-            fedbiomed_tags.append("brain_age")
+        target_cols = [ML_TARGET_MAP[self.data_tags].value.upper()]
         self.target_cols = target_cols
-        self.data_tags = data_tags
+
+        problem = ML_PROBLEM_MAP[self.data_tags]
+        self.problem = problem
+
+        fedbiomed_tags = [self.data_tags]
         self.fedbiomed_tags = fedbiomed_tags
 
         if not self.fpath_config.exists():
@@ -306,17 +308,13 @@ class FedbiomedWorkflow:
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
     envvar="FPATH_FEDBIOMED_CONFIG",
 )
+@click.option("--tag", "data_tags", required=True)
 @click.option(
     "--setup",
     "setups",
     type=click.Choice(MlSetup, case_sensitive=False),
     multiple=True,
     default=DEFAULT_SETUPS,
-)
-@click.option(
-    "--problem",
-    type=click.Choice(MlProblem, case_sensitive=False),
-    required=True,
 )
 @click.option(
     "--framework",

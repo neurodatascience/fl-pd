@@ -19,6 +19,7 @@ def get_df_pheno(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
 ):
@@ -30,6 +31,8 @@ def get_df_pheno(
         cols.append("AGE")
     if include_sex:
         cols.append("SEX")
+    if include_diag:
+        cols.append("DIAGNOSIS")
 
     df_pheno = pd.read_csv(fpath_pheno, low_memory=False)
     df_pheno["participant_id"] = "ADNI" + df_pheno["PTID"].str.replace("_", "")
@@ -41,6 +44,13 @@ def get_df_pheno(
     # use PPMI coding for sex
     df_pheno["SEX"] = (
         df_pheno["PTGENDER"].map({"Male": 1, "Female": 0}).astype("category")
+    )
+
+    # recode diagnosis
+    df_pheno["DIAGNOSIS"] = (
+        df_pheno["DX_bl"]
+        .map(lambda x: 0 if x == "CN" else (1 if not pd.isna(x) else pd.NA))
+        .astype("category")
     )
 
     visits = [
@@ -141,6 +151,7 @@ def get_df_adni(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
     include_aparc=True,
@@ -151,6 +162,7 @@ def get_df_adni(
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
+        include_diag=include_diag,
         include_cases=include_cases,
         include_controls=include_controls,
     )
@@ -187,6 +199,7 @@ def get_df_adni(
 @click.option("--decline/--no-decline", "include_decline", default=True)
 @click.option("--age/--no-age", "include_age", default=True)
 @click.option("--sex/--no-sex", "include_sex", default=False)
+@click.option("--diag/--no-diag", "include_diag", default=False)
 @click.option("--cases/--no-cases", "include_cases", default=True)
 @click.option("--controls/--no-controls", "include_controls", default=False)
 @click.option("--aparc/--no-aparc", "include_aparc", default=True)
@@ -198,6 +211,7 @@ def get_data_adni(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
     include_aparc=True,
@@ -211,6 +225,8 @@ def get_data_adni(
         fname_data_out_components.append("age")
     if include_sex:
         fname_data_out_components.append("sex")
+    if include_diag:
+        fname_data_out_components.append("diag")
     if include_cases:
         fname_data_out_components.append("case")
     if include_controls:
@@ -229,6 +245,7 @@ def get_data_adni(
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
+        include_diag=include_diag,
         include_cases=include_cases,
         include_controls=include_controls,
         include_aparc=include_aparc,

@@ -8,7 +8,7 @@ from sklearn.metrics import (
     explained_variance_score,
 )
 
-from fl_pd.utils.enums import MlProblem
+from fl_pd.utils.constants import MlProblem
 
 
 def get_metrics_map(problem: MlProblem):

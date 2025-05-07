@@ -25,6 +25,7 @@ def get_df_pheno(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
 ):
@@ -35,6 +36,8 @@ def get_df_pheno(
         cols.append("AGE")
     if include_sex:
         cols.append("SEX")
+    if include_diag:
+        cols.append("DIAGNOSIS")
 
     df_demographics = pd.read_csv(fpath_demographics).set_index("participant_id")
     df_age = (
@@ -65,6 +68,13 @@ def get_df_pheno(
         .astype("category")
     )
 
+    # recode diagnosis
+    df_pheno["DIAGNOSIS"] = (
+        df_pheno["diagnosis_group_for_analysis"]
+        .map({"control": 0, "PD": 1})
+        .astype("category")
+    )
+
     # education
     # probably not best to have this as category
     # but the edge values are 6- and 20+ so this is not entirely numeric
@@ -91,10 +101,12 @@ def get_df_pheno(
         lambda x: x <= -3 if not np.isnan(x) else np.nan
     )
 
+    diagnoses_to_include = []
     if include_cases:
-        df_pheno = df_pheno.query('diagnosis_group_for_analysis == "PD"')
+        diagnoses_to_include.append("PD")
     if include_controls:
-        df_pheno = df_pheno.query('diagnosis_group_for_analysis == "control"')
+        diagnoses_to_include.append("control")
+    df_pheno = df_pheno.query("diagnosis_group_for_analysis in @diagnoses_to_include")
 
     df_pheno = df_pheno[cols]
     print(f"Keeping phenotypic columns: {cols}")
@@ -139,6 +151,7 @@ def get_df_qpn(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
     include_aparc=True,
@@ -152,6 +165,7 @@ def get_df_qpn(
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
+        include_diag=include_diag,
         include_cases=include_cases,
         include_controls=include_controls,
     )
@@ -201,6 +215,7 @@ def get_df_qpn(
 @click.option("--decline/--no-decline", "include_decline", default=True)
 @click.option("--age/--no-age", "include_age", default=True)
 @click.option("--sex/--no-sex", "include_sex", default=False)
+@click.option("--diag/--no-diag", "include_diag", default=False)
 @click.option("--cases/--no-cases", "include_cases", default=True)
 @click.option("--controls/--no-controls", "include_controls", default=False)
 @click.option("--aparc/--no-aparc", "include_aparc", default=True)
@@ -215,6 +230,7 @@ def get_data_qpn(
     include_decline=True,
     include_age=True,
     include_sex=False,
+    include_diag=False,
     include_cases=True,
     include_controls=False,
     include_aparc=True,
@@ -227,6 +243,8 @@ def get_data_qpn(
         fname_data_out_components.append("age")
     if include_sex:
         fname_data_out_components.append("sex")
+    if include_diag:
+        fname_data_out_components.append("diag")
     if include_cases:
         fname_data_out_components.append("case")
     if include_controls:
@@ -249,6 +267,7 @@ def get_data_qpn(
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
+        include_diag=include_diag,
         include_cases=include_cases,
         include_controls=include_controls,
         include_aparc=include_aparc,
