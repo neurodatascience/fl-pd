@@ -6,7 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 
-from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
 from fl_pd.utils.freesurfer import fs7_aparc_to_keep, fs7_aseg_to_keep
 
 VISIT_IDS_ORDERED = [

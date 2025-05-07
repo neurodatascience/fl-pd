@@ -2,6 +2,8 @@ import enum
 
 CLICK_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"], "show_default": True}
 
+DATASETS = ("adni", "ppmi", "qpn", "site1", "site2", "site3")
+
 
 class MlSetup(str, enum.Enum):
     SILO = "silo"
@@ -23,6 +25,7 @@ class MlTarget(str, enum.Enum):
     COG_DECLINE = "cog_decline"
     AGE = "age"
     DIAGNOSIS = "diagnosis"
+    MMSE = "mmse"
 
 
 ML_TARGET_MAP = {
@@ -31,6 +34,7 @@ ML_TARGET_MAP = {
     "age-sex-diag-case-hc-aseg": MlTarget.DIAGNOSIS,
     "age-diag-case-hc-aseg": MlTarget.DIAGNOSIS,
     "age-sex-diag-case-hc-aparc": MlTarget.DIAGNOSIS,
+    "simulated": MlTarget.MMSE,
 }
 
 ML_PROBLEM_MAP = {
@@ -39,4 +43,5 @@ ML_PROBLEM_MAP = {
     "age-sex-diag-case-hc-aseg": MlProblem.CLASSIFICATION,
     "age-diag-case-hc-aseg": MlProblem.CLASSIFICATION,
     "age-sex-diag-case-hc-aparc": MlProblem.CLASSIFICATION,
+    "simulated": MlProblem.REGRESSION,
 }

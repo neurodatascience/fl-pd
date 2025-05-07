@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
-from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)

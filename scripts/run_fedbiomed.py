@@ -16,13 +16,13 @@ from fedbiomed.researcher.aggregators.fedavg import FedAverage
 
 from fl_pd.io import load_Xy
 from fl_pd.metrics import get_metrics_map
-from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
 from fl_pd.utils.constants import (
+    CLICK_CONTEXT_SETTINGS,
+    ML_PROBLEM_MAP,
+    ML_TARGET_MAP,
     MlProblem,
     MlSetup,
     MlFramework,
-    ML_PROBLEM_MAP,
-    ML_TARGET_MAP,
 )
 
 DEFAULT_SETUPS = tuple([setup for setup in MlSetup])

@@ -11,11 +11,7 @@ import warnings
 import click
 import pandas as pd
 
-from fl_pd.utils.constants import ML_PROBLEM_MAP
-
-DATASET_NAMES = ("adni", "ppmi", "qpn")
-
-ALLOWED_DATA_TAGS = ()
+from fl_pd.utils.constants import DATASETS, ML_PROBLEM_MAP
 
 NODE_MAP = {
     "mega": "node-mega",
@@ -26,7 +22,7 @@ NODE_MAP = {
 
 
 def _get_dataset_name(fname) -> str:
-    for dataset_name in ("mega",) + DATASET_NAMES:
+    for dataset_name in ("mega",) + DATASETS:
         if dataset_name in fname:
             return dataset_name
     raise ValueError(f"No dataset name found for {fname=}")

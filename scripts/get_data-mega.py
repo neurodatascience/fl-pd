@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 import pandas as pd
 
-from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, DATASETS
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
@@ -14,7 +14,11 @@ from fl_pd.utils.cli import CLICK_CONTEXT_SETTINGS
     type=click.Path(path_type=Path, exists=True, file_okay=False),
     envvar="DPATH_FL_DATA",
 )
-@click.argument("datasets", type=click.Choice(["adni", "ppmi", "qpn"]), nargs=-1)
+@click.argument(
+    "datasets",
+    type=click.Choice(DATASETS),
+    nargs=-1,
+)
 @click.option("--tag", type=str, help="Data subdirectory name")
 @click.option("--suffix", type=str, help="Train/test partition suffix")
 @click.option("--shuffle/--no-shuffle", default=True)
