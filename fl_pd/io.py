@@ -5,7 +5,6 @@ from skrub import TableVectorizer
 def load_Xy(
     fpath,
     target_cols,
-    min_age=None,
     return_vectorizer=False,
     dataset=None,
     setup=None,
@@ -16,9 +15,6 @@ def load_Xy(
     df: pd.DataFrame = pd.read_csv(fpath, sep="\t")
     df = df.set_index("participant_id")
     df = df.dropna(axis="index", how="any")
-
-    if min_age is not None:
-        df = df.query(f"AGE >= {min_age}")
 
     table_vectorizer = TableVectorizer()
     df = table_vectorizer.fit_transform(df)

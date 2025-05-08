@@ -39,7 +39,7 @@ def get_data_mega(dpath_data, datasets, tag, suffix, shuffle, random_state):
         df_mega = df_mega.sample(frac=1, replace=False, random_state=random_state)
     print(f"mega:\t{df_mega.shape}")
 
-    tag_output = "_".join(["mega"] + list(datasets)) + f"-{tag}"
+    tag_output = "_".join(["mega"] + list(sorted(datasets))) + f"-{tag}"
     fpath_mega = dpath_data / tag_output / f"{tag_output}{suffix}.tsv"
     fpath_mega.parent.mkdir(parents=True, exist_ok=True)
     df_mega.to_csv(fpath_mega, sep="\t", index=True, header=True)

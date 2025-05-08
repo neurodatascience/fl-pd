@@ -25,7 +25,6 @@ class TrainingPlanMixin:
     def training_data(self: BaseTrainingPlan):
         model_args = self.model_args()
         target_cols = model_args["target_cols"]
-        min_age = model_args.get("min_age")
         n_features = model_args["n_targets"]
         n_targets = model_args["n_features"]
         shuffle = model_args.get("shuffle", False)
@@ -33,7 +32,6 @@ class TrainingPlanMixin:
         X_train, y_train, table_vectorizer = load_Xy(
             self.dataset_path,
             target_cols=target_cols,
-            min_age=min_age,
             return_vectorizer=True,
         )
         self.table_vectorizer_ = table_vectorizer

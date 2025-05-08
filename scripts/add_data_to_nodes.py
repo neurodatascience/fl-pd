@@ -11,7 +11,8 @@ import warnings
 import click
 import pandas as pd
 
-from fl_pd.utils.constants import DATASETS, ML_PROBLEM_MAP
+from fl_pd.ml_spec import TAG_TO_ML_TARGET_MAP
+from fl_pd.utils.constants import DATASETS
 
 NODE_MAP = {
     "mega": "node-mega",
@@ -29,10 +30,12 @@ def _get_dataset_name(fname) -> str:
 
 
 def _get_data_tag(fname) -> str:
-    for substring in ML_PROBLEM_MAP.keys():
-        if substring in fname:
-            return substring
-    raise ValueError(f"Invalid data tags for {fname=}")
+    for substring in TAG_TO_ML_TARGET_MAP.keys():
+        for suffix in ["-standardized", ""]:
+            substring = f"{substring}{suffix}"
+            if substring in fname:
+                return substring
+    raise ValueError(f"Invalid data tag for {fname=}")
 
 
 def _get_i_train(fname) -> int:
@@ -47,11 +50,8 @@ def _get_data_info(fname) -> Tuple[str, str, int]:
     return (_get_dataset_name(fname), _get_data_tag(fname), _get_i_train(fname))
 
 
-def _get_tags(dataset_name: str, data_tag: str, i_train: int) -> str:
-    tags = []
-    if dataset_name != "mega":
-        tags.append("federated")
-    tags.extend([dataset_name, data_tag, f"{i_train}train"])
+def _get_tags(data_tag: str, i_train: int) -> str:
+    tags = [data_tag, f"{i_train}train"]
     return ",".join(tags)
 
 
@@ -85,7 +85,7 @@ def _add_data_to_node(fpath_tsv: Path, dpath_nodes: Path):
         "path": str(fpath_tsv),
         "data_type": "csv",
         "description": "",
-        "tags": _get_tags(dataset_name, data_tag, i_train),
+        "tags": _get_tags(data_tag, i_train),
         "name": f"{dataset_name.upper()} {data_tag} (train {i_train})",
     }
     with tempfile.NamedTemporaryFile(mode="+wt") as file_json:

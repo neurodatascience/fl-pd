@@ -18,15 +18,13 @@ from fl_pd.io import load_Xy
 from fl_pd.metrics import get_metrics_map
 from fl_pd.utils.constants import (
     CLICK_CONTEXT_SETTINGS,
-    ML_PROBLEM_MAP,
-    ML_TARGET_MAP,
     MlProblem,
     MlSetup,
     MlFramework,
 )
+from fl_pd.ml_spec import ML_TARGET_TO_PROBLEM_MAP, get_target_from_tag
 
 DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
-DEFAULT_MIN_AGE = 55
 DEFAULT_DATASETS = ("adni", "ppmi", "qpn")
 DEFAULT_N_SPLITS = 1
 DEFAULT_SGDC_LOSS = "log_loss"
@@ -47,7 +45,6 @@ class FedbiomedWorkflow:
         data_tags: str,
         framework: MlFramework,
         setups: Iterable[MlSetup] = DEFAULT_SETUPS,
-        min_age: int = DEFAULT_MIN_AGE,
         sgdc_loss: str = DEFAULT_SGDC_LOSS,
         sgdr_loss: str = DEFAULT_SGDR_LOSS,
         test_datasets: Iterable[str] = DEFAULT_DATASETS,
@@ -63,7 +60,6 @@ class FedbiomedWorkflow:
         self.data_tags = data_tags
         self.setups = setups
         self.framework = framework
-        self.min_age = min_age
         self.sgdc_loss = sgdc_loss
         self.sgdr_loss = sgdr_loss
         self.test_datasets = test_datasets
@@ -72,10 +68,10 @@ class FedbiomedWorkflow:
         self.sloppy = sloppy
         self.overwrite = overwrite
 
-        target_cols = [ML_TARGET_MAP[self.data_tags].value.upper()]
+        target_cols = [get_target_from_tag(self.data_tags).value.upper()]
         self.target_cols = target_cols
 
-        problem = ML_PROBLEM_MAP[self.data_tags]
+        problem = ML_TARGET_TO_PROBLEM_MAP[get_target_from_tag(self.data_tags)]
         self.problem = problem
 
         fedbiomed_tags = [self.data_tags]
@@ -101,7 +97,7 @@ class FedbiomedWorkflow:
         dpath_run_results = (
             self.dpath_results
             / datetime.datetime.now().strftime("%Y_%m_%d")
-            / f"{framework_tags}-{self.data_tags}-{self.min_age}-{self.random_state}"
+            / f"{framework_tags}-{self.data_tags}-{self.random_state}"
         )
         self.dpath_run_results = dpath_run_results
 
@@ -143,7 +139,6 @@ class FedbiomedWorkflow:
             "n_features": n_features,
             "n_targets": n_targets,
             "target_cols": self.target_cols,
-            "min_age": self.min_age,
             "shuffle": True,
             "problem_type": self.problem.value,
         }
@@ -321,7 +316,6 @@ class FedbiomedWorkflow:
     type=click.Choice(MlFramework, case_sensitive=False),
     required=True,
 )
-@click.option("--min-age", type=int, default=DEFAULT_MIN_AGE)
 @click.option(
     "--sgdc-loss",
     type=str,

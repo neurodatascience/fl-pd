@@ -32,12 +32,12 @@ source config/.env
 ./scripts/get_data-simulated.py $DPATH_FL_DATA
 
 # split into training and testing sets
-./scripts/split_train_test.py --n-splits 10 --stratify-col COG_DECLINE --shuffle --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-decline-age-case-aparc
-./scripts/split_train_test.py --n-splits 10 --stratify-col AGE --shuffle --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-sex-hc-aseg
-./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-sex-diag-case-hc-aseg
-./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-diag-case-hc-aseg
-./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-sex-diag-case-hc-aparc
-./scripts/split_train_test.py --n-splits 10 --shuffle --random-state $RANDOM_SEED $DPATH_FL_DATA {site1,site2,site3}-simulated
+./scripts/split_train_test.py --n-splits 10 --stratify-col COG_DECLINE --shuffle --no-standardize --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-decline-age-case-aparc
+./scripts/split_train_test.py --n-splits 10 --stratify-col AGE --shuffle --no-standardize --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-sex-hc-aseg
+./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --no-standardize --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-sex-diag-case-hc-aseg
+./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --no-standardize --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-diag-case-hc-aseg
+./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --no-standardize --random-state $RANDOM_SEED $DPATH_FL_DATA {adni,ppmi,qpn}-age-sex-diag-case-hc-aparc
+./scripts/split_train_test.py --n-splits 10 --shuffle --standardize --min-age 0 --random-state $RANDOM_SEED $DPATH_FL_DATA {site1,site2,site3}-simulated
 
 # combine for mega-analysis case
 parallel ./scripts/get_data-mega.py --tag decline-age-case-aparc --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA adni ppmi qpn ::: {0..9}
@@ -46,6 +46,7 @@ parallel ./scripts/get_data-mega.py --tag age-sex-diag-case-hc-aseg --suffix '-{
 parallel ./scripts/get_data-mega.py --tag age-diag-case-hc-aseg --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA adni ppmi qpn ::: {0..9}
 parallel ./scripts/get_data-mega.py --tag age-sex-diag-case-hc-aparc --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA adni ppmi qpn ::: {0..9}
 parallel ./scripts/get_data-mega.py --tag simulated --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA site1 site2 site3 ::: {0..9}
+parallel ./scripts/get_data-mega.py --tag simulated-standardized --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA site1 site2 site3 ::: {0..9}
 
 # create the nodes
 fedbiomed component create -p ./fedbiomed/node-mega -c NODE
@@ -70,4 +71,4 @@ fedbiomed node -p ./fedbiomed/node-qpn start
 ./scripts/run_fedbiomed.py --tag age-diag-case-hc-aseg --sgdc-loss log_loss --framework sklearn --n-splits 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_RESEARCHER $FPATH_FEDBIOMED_CONFIG
 ./scripts/run_fedbiomed.py --tag age-sex-hc-aseg --framework sklearn --n-splits 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_RESEARCHER $FPATH_FEDBIOMED_CONFIG
 ./scripts/run_fedbiomed.py --tag age-sex-diag-case-hc-aparc --framework sklearn --n-splits 1 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_RESEARCHER $FPATH_FEDBIOMED_CONFIG
-./scripts/run_fedbiomed.py --tag simulated --dataset site1 --dataset site2 --dataset site3 --framework sklearn --n-splits 1 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_RESEARCHER $FPATH_FEDBIOMED_CONFIG
+./scripts/run_fedbiomed.py --tag simulated-standardized --dataset site1 --dataset site2 --dataset site3 --framework sklearn --n-splits 1 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_RESEARCHER $FPATH_FEDBIOMED_CONFIG
