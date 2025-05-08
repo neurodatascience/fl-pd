@@ -1,6 +1,8 @@
 import pandas as pd
 from skrub import TableVectorizer
 
+from fl_pd.utils.constants import MlSetup
+
 
 def load_Xy(
     fpath,
@@ -10,7 +12,7 @@ def load_Xy(
     setup=None,
     datasets=None,
 ):
-    is_mega = setup == "mega"
+    is_mega = setup == MlSetup.MEGA
 
     df: pd.DataFrame = pd.read_csv(fpath, sep="\t")
     df = df.set_index("participant_id")
@@ -19,12 +21,14 @@ def load_Xy(
     table_vectorizer = TableVectorizer()
     df = table_vectorizer.fit_transform(df)
 
-    if is_mega and dataset not in df.columns:
+    if is_mega and not (any(["dataset_" in col for col in df.columns])):
         if datasets is None:
             raise ValueError("datasets is None")
         for col_dataset in datasets:
             if col_dataset not in df.columns:
-                df.loc[:, col_dataset] = 1 if col_dataset == dataset else 0
+                df.loc[:, f"dataset_{col_dataset}"] = 1 if col_dataset == dataset else 0
+
+    df = df[sorted(df.columns)]
 
     y = df.loc[:, target_cols]
     X = df.drop(columns=target_cols)
