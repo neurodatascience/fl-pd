@@ -1,16 +1,11 @@
 default: &default-config
-  rounds: 1
+  rounds: 100
   training_args: &default-training-args
-    epochs: 100
+    epochs: 1
     loader_args: &default-loader-args
       batch_size: 128
 silo: *default-config
-federated:
-  <<: *default-config
-  rounds: 3
-  training_args:
-    <<: *default-training-args
-    epochs: 100
+federated: *default-config
 mega: *default-config
 fast:
   <<: *default-config

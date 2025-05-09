@@ -135,6 +135,7 @@ class FedbiomedWorkflow:
 
     def get_model_args(self, n_features, n_targets):
         model_args = {
+            "eta0": 0.05,
             "random_state": self.random_state,
             "n_features": n_features,
             "n_targets": n_targets,
