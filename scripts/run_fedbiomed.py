@@ -5,7 +5,7 @@ import json
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Generator, Iterable, Optional
 
 import click
 import pandas as pd
@@ -27,6 +27,7 @@ from fl_pd.ml_spec import ML_TARGET_TO_PROBLEM_MAP, get_target_from_tag
 DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
 DEFAULT_DATASETS = ("adni", "ppmi", "qpn")
 DEFAULT_N_SPLITS = 1
+DEFAULT_N_ITER_NULL = 1
 DEFAULT_SGDC_LOSS = "log_loss"
 DEFAULT_SGDR_LOSS = "squared_error"
 
@@ -49,6 +50,8 @@ class FedbiomedWorkflow:
         sgdr_loss: str = DEFAULT_SGDR_LOSS,
         test_datasets: Iterable[str] = DEFAULT_DATASETS,
         n_splits: int = DEFAULT_N_SPLITS,
+        null: bool = False,
+        n_iter_null: int = DEFAULT_N_ITER_NULL,
         random_state: Optional[int] = None,
         sloppy: bool = False,
         overwrite: bool = False,
@@ -58,12 +61,14 @@ class FedbiomedWorkflow:
         self.dpath_researcher = Path(dpath_researcher)
         self.fpath_config = Path(fpath_config)
         self.data_tags = data_tags
-        self.setups = setups
         self.framework = framework
+        self.setups = setups
         self.sgdc_loss = sgdc_loss
         self.sgdr_loss = sgdr_loss
         self.test_datasets = test_datasets
         self.n_splits = n_splits
+        self.null = null
+        self.n_iter_null = n_iter_null
         self.random_state = random_state
         self.sloppy = sloppy
         self.overwrite = overwrite
@@ -133,7 +138,7 @@ class FedbiomedWorkflow:
 
         return Xy_test_all, n_features, n_targets
 
-    def get_model_args(self, n_features, n_targets):
+    def get_model_args(self, n_features, n_targets, null=False):
         model_args = {
             "eta0": 0.05,
             "random_state": self.random_state,
@@ -142,6 +147,7 @@ class FedbiomedWorkflow:
             "target_cols": self.target_cols,
             "shuffle": True,
             "problem_type": self.problem.value,
+            "null": null,
         }
         if self.problem == MlProblem.CLASSIFICATION:
             model_args["n_classes"] = 2
@@ -167,11 +173,13 @@ class FedbiomedWorkflow:
 
     def get_results(
         self,
-        i_split,
+        i_split: int,
+        i_iter: int,
+        null: bool,
         setup: MlSetup,
         test_datasets_subset: Iterable[str],
         nodes: Iterable[str],
-    ):
+    ) -> Generator[dict, None, None]:
         Xy_test_all, n_features, n_targets = self.get_test_data(
             i_split=i_split, setup=setup
         )
@@ -185,7 +193,7 @@ class FedbiomedWorkflow:
             nodes=nodes,
             tags=self.fedbiomed_tags + [f"{i_split}train"],
             training_plan_class=self.get_training_plan(),
-            model_args=self.get_model_args(n_features, n_targets),
+            model_args=self.get_model_args(n_features, n_targets, null=null),
             round_limit=fbm_training_config["rounds"],
             training_args=fbm_training_config["training_args"],
             aggregator=FedAverage(),
@@ -205,7 +213,6 @@ class FedbiomedWorkflow:
 
         # evaluate
         metrics_map = get_metrics_map(self.problem)
-        data_results = []
         for test_dataset in test_datasets_subset:
             X_test, y_test = Xy_test_all[test_dataset]
 
@@ -213,24 +220,63 @@ class FedbiomedWorkflow:
                 y_pred = model.predict(X_test)
 
             for metric_name, metric_func in metrics_map.items():
-                data_results.append(
-                    {
-                        "setup": setup.value,
-                        "problem": self.problem.value,
-                        "framework": self.framework.value,
-                        # for silo, the test dataset is also the train dataset
-                        "test_dataset": test_dataset,
-                        "metric": metric_name,
-                        "i_split": i_split,
-                        "score": metric_func(y_test, y_pred),
-                    }
-                )
-        return data_results
+                yield {
+                    "setup": setup.value,
+                    "problem": self.problem.value,
+                    "framework": self.framework.value,
+                    # for silo, the test dataset is also the train dataset
+                    "test_dataset": test_dataset,
+                    "is_null": null,
+                    "metric": metric_name,
+                    "i_split": i_split,
+                    "i_iter": i_iter,
+                    "score": metric_func(y_test, y_pred),
+                }
+
+    def get_results_all_setups(
+        self, n_iter: int, null: bool = False
+    ) -> Generator[dict, None, None]:
+        for setup in self.setups:
+            for i_split in range(self.n_splits):
+                for i_iter in range(n_iter):
+                    if setup == MlSetup.SILO:
+                        for dataset in self.test_datasets:
+                            yield from (
+                                self.get_results(
+                                    i_split=i_split,
+                                    i_iter=i_iter,
+                                    null=null,
+                                    setup=setup,
+                                    test_datasets_subset=[dataset],
+                                    nodes=[f"NODE_{dataset.upper()}"],
+                                )
+                            )
+                    else:
+                        if setup == MlSetup.FEDERATED:
+                            nodes = [
+                                f"NODE_{dataset.upper()}"
+                                for dataset in self.test_datasets
+                            ]
+                        elif setup == MlSetup.MEGA:
+                            nodes = ["NODE_MEGA"]
+                        yield from (
+                            self.get_results(
+                                i_split=i_split,
+                                i_iter=i_iter,
+                                null=null,
+                                setup=setup,
+                                test_datasets_subset=self.test_datasets,
+                                nodes=nodes,
+                            )
+                        )
 
     def run(self):
         # results paths
         fname_base_metrics = f"metrics-{self.n_splits}_splits"
         fname_base_settings = f"settings-{self.n_splits}_splits"
+        if self.null:
+            fname_base_metrics += f"-{self.n_iter_null}_null"
+            fname_base_settings += f"-{self.n_iter_null}_null"
         if self.sloppy:
             fname_base_metrics += "-sloppy"
             fname_base_settings += "-sloppy"
@@ -246,41 +292,27 @@ class FedbiomedWorkflow:
             )
         fpath_settings.write_text(json.dumps(self.settings, indent=4))
 
+        # normal models
         data_results = []
-        for setup in self.setups:
-            for i_split in range(self.n_splits):
+        for results in self.get_results_all_setups(n_iter=1, null=False):
+            # save the results as they are being obtained
+            data_results.append(results)
+            df_results = pd.DataFrame(data_results)
+            if len(df_results) > 0:
+                df_results.to_csv(fpath_metrics, sep="\t", index=False)
 
-                if setup == MlSetup.SILO:
-                    for dataset in self.test_datasets:
-                        data_results.extend(
-                            self.get_results(
-                                i_split=i_split,
-                                setup=setup,
-                                test_datasets_subset=[dataset],
-                                nodes=[f"NODE_{dataset.upper()}"],
-                            )
-                        )
-                else:
-                    if setup == MlSetup.FEDERATED:
-                        nodes = [
-                            f"NODE_{dataset.upper()}" for dataset in self.test_datasets
-                        ]
-                    elif setup == MlSetup.MEGA:
-                        nodes = ["NODE_MEGA"]
-                    data_results.extend(
-                        self.get_results(
-                            i_split=i_split,
-                            setup=setup,
-                            test_datasets_subset=self.test_datasets,
-                            nodes=nodes,
-                        )
-                    )
-
+        # null models
+        if self.null:
+            for results in self.get_results_all_setups(
+                n_iter=self.n_iter_null, null=True
+            ):
                 # save the results as they are being obtained
+                data_results.append(results)
                 df_results = pd.DataFrame(data_results)
                 if len(df_results) > 0:
                     df_results.to_csv(fpath_metrics, sep="\t", index=False)
-                    print(f"Results saved to {fpath_metrics}")
+
+        print(f"Results saved to {fpath_metrics}")
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
@@ -338,6 +370,13 @@ class FedbiomedWorkflow:
     help="Dataset to use for testing (train datasets determined by active nodes and MlSetup).",
 )
 @click.option("--n-splits", type=click.IntRange(min=1), default=1)
+@click.option("--null/--no-null", default=False)
+@click.option(
+    "--n-iter-null",
+    type=click.IntRange(min=1),
+    default=DEFAULT_N_ITER_NULL,
+    help="Number of iterations for null data",
+)
 @click.option(
     "--random-state",
     type=int,

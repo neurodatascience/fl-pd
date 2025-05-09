@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from skrub import TableVectorizer
 
@@ -11,6 +12,7 @@ def load_Xy(
     dataset=None,
     setup=None,
     datasets=None,
+    null=False,
 ):
     is_mega = setup == MlSetup.MEGA
 
@@ -32,6 +34,12 @@ def load_Xy(
 
     y = df.loc[:, target_cols]
     X = df.drop(columns=target_cols)
+
+    if null:
+        rng = np.random.default_rng()
+        idx = np.arange(len(y))
+        rng.shuffle(idx)
+        y = y.iloc[idx]
 
     if return_vectorizer:
         return X, y, table_vectorizer

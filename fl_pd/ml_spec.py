@@ -6,12 +6,14 @@ TAG_TO_ML_TARGET_MAP = {
     "age-sex-diag-case-hc-aseg": MlTarget.DIAGNOSIS,
     "age-diag-case-hc-aseg": MlTarget.DIAGNOSIS,
     "age-sex-diag-case-hc-aparc": MlTarget.DIAGNOSIS,
+    "age-sex-diag-case-hc-aparc-aseg": MlTarget.DIAGNOSIS,
     "simulated": MlTarget.MMSE,
 }
 
 
 ML_TARGET_TO_PROBLEM_MAP = {
     MlTarget.MMSE: MlProblem.REGRESSION,
+    MlTarget.DIAGNOSIS: MlProblem.CLASSIFICATION,
 }
 
 

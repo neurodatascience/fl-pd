@@ -28,11 +28,13 @@ class TrainingPlanMixin:
         n_features = model_args["n_targets"]
         n_targets = model_args["n_features"]
         shuffle = model_args.get("shuffle", False)
+        null = model_args.get("null", False)
 
         X_train, y_train, table_vectorizer = load_Xy(
             self.dataset_path,
             target_cols=target_cols,
             return_vectorizer=True,
+            null=null,
         )
         self.table_vectorizer_ = table_vectorizer
 
