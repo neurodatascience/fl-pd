@@ -3,6 +3,7 @@ from fl_pd.utils.constants import DATASETS, MlProblem, MlTarget
 TAG_TO_ML_TARGET_MAP = {
     "decline-age-case-aparc": MlTarget.COG_DECLINE,
     "age-sex-hc-aseg": MlTarget.AGE,
+    "age-sex-hc-aseg-55": MlTarget.AGE,
     "age-sex-diag-case-hc-aseg": MlTarget.DIAGNOSIS,
     "age-diag-case-hc-aseg": MlTarget.DIAGNOSIS,
     "age-sex-diag-case-hc-aparc": MlTarget.DIAGNOSIS,
@@ -14,6 +15,7 @@ TAG_TO_ML_TARGET_MAP = {
 ML_TARGET_TO_PROBLEM_MAP = {
     MlTarget.MMSE: MlProblem.REGRESSION,
     MlTarget.DIAGNOSIS: MlProblem.CLASSIFICATION,
+    MlTarget.AGE: MlProblem.REGRESSION,
 }
 
 

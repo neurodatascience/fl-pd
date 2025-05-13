@@ -1,10 +1,13 @@
 from fedbiomed.common.data import DataManager
 from fedbiomed.common.training_plans import BaseTrainingPlan
 
+from fedbiomed.common.optimizers.declearn import AdamModule
+from fedbiomed.common.optimizers.optimizer import Optimizer
+
 from fl_pd.io import load_Xy
 
 
-class TrainingPlanMixin:
+class DataLoaderMixin:
 
     def __init__(self):
         super().__init__()
@@ -13,7 +16,7 @@ class TrainingPlanMixin:
     def init_dependencies(self):
         deps = [
             "from fl_pd.io import load_Xy",
-            "from fl_pd.training_plans.mixins import TrainingPlanMixin",
+            "from fl_pd.training_plans.mixins import DataLoaderMixin",
         ]
         try:
             deps.extend(super().init_dependencies())
@@ -55,3 +58,21 @@ class TrainingPlanMixin:
         )
 
         return data_manager
+
+
+class AdamOptimizerMixin:
+    def init_dependencies(self):
+        deps = [
+            "from fl_pd.training_plans.mixins import AdamOptimizerMixin",
+            "from fedbiomed.common.optimizers.declearn import AdamModule",
+            "from fedbiomed.common.optimizers.optimizer import Optimizer",
+        ]
+        try:
+            deps.extend(super().init_dependencies())
+        except AttributeError:
+            pass
+
+        return deps
+
+    def init_optimizer(self, optimizer_args):
+        return Optimizer(lr=optimizer_args["lr"], modules=[AdamModule()])

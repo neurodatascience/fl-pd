@@ -1,9 +1,11 @@
 default: &default-config
-  rounds: 100
+  rounds: 200
   training_args: &default-training-args
     epochs: 1
     loader_args: &default-loader-args
       batch_size: 128
+    optimizer_args: &default-optimizer-args
+      lr: 0.001
 silo: *default-config
 federated: *default-config
 mega: *default-config

@@ -11,6 +11,8 @@ import click
 import pandas as pd
 from yaml import load, Loader
 
+# from fedbiomed.common.optimizers.optimizer import Optimizer
+# from fedbiomed.common.optimizers.declearn import YogiModule as FedYogi
 from fedbiomed.researcher.federated_workflows import Experiment
 from fedbiomed.researcher.aggregators.fedavg import FedAverage
 
@@ -50,7 +52,6 @@ class FedbiomedWorkflow:
         sgdr_loss: str = DEFAULT_SGDR_LOSS,
         test_datasets: Iterable[str] = DEFAULT_DATASETS,
         n_splits: int = DEFAULT_N_SPLITS,
-        null: bool = False,
         n_iter_null: int = DEFAULT_N_ITER_NULL,
         random_state: Optional[int] = None,
         sloppy: bool = False,
@@ -67,7 +68,6 @@ class FedbiomedWorkflow:
         self.sgdr_loss = sgdr_loss
         self.test_datasets = test_datasets
         self.n_splits = n_splits
-        self.null = null
         self.n_iter_null = n_iter_null
         self.random_state = random_state
         self.sloppy = sloppy
@@ -140,7 +140,8 @@ class FedbiomedWorkflow:
 
     def get_model_args(self, n_features, n_targets, null=False):
         model_args = {
-            "eta0": 0.05,
+            "eta0": 0.05,  # NativeSklearnOptimizer
+            # "learning_rate": 0.01,  # NativeSklearnOptimizer
             "random_state": self.random_state,
             "n_features": n_features,
             "n_targets": n_targets,
@@ -197,6 +198,10 @@ class FedbiomedWorkflow:
             round_limit=fbm_training_config["rounds"],
             training_args=fbm_training_config["training_args"],
             aggregator=FedAverage(),
+            # agg_optimizer=Optimizer(
+            #     **fbm_training_config["training_args"]["optimizer_args"],
+            #     modules=[FedYogi()],
+            # ),
             node_selection_strategy=None,
             # config_path=self.dpath_researcher,  # seems to be causing auth problems
         )
@@ -272,11 +277,8 @@ class FedbiomedWorkflow:
 
     def run(self):
         # results paths
-        fname_base_metrics = f"metrics-{self.n_splits}_splits"
-        fname_base_settings = f"settings-{self.n_splits}_splits"
-        if self.null:
-            fname_base_metrics += f"-{self.n_iter_null}_null"
-            fname_base_settings += f"-{self.n_iter_null}_null"
+        fname_base_metrics = f"metrics-{self.n_splits}_splits-{self.n_iter_null}_null"
+        fname_base_settings = f"settings-{self.n_splits}_splits-{self.n_iter_null}_null"
         if self.sloppy:
             fname_base_metrics += "-sloppy"
             fname_base_settings += "-sloppy"
@@ -302,15 +304,12 @@ class FedbiomedWorkflow:
                 df_results.to_csv(fpath_metrics, sep="\t", index=False)
 
         # null models
-        if self.null:
-            for results in self.get_results_all_setups(
-                n_iter=self.n_iter_null, null=True
-            ):
-                # save the results as they are being obtained
-                data_results.append(results)
-                df_results = pd.DataFrame(data_results)
-                if len(df_results) > 0:
-                    df_results.to_csv(fpath_metrics, sep="\t", index=False)
+        for results in self.get_results_all_setups(n_iter=self.n_iter_null, null=True):
+            # save the results as they are being obtained
+            data_results.append(results)
+            df_results = pd.DataFrame(data_results)
+            if len(df_results) > 0:
+                df_results.to_csv(fpath_metrics, sep="\t", index=False)
 
         print(f"Results saved to {fpath_metrics}")
 
@@ -370,10 +369,10 @@ class FedbiomedWorkflow:
     help="Dataset to use for testing (train datasets determined by active nodes and MlSetup).",
 )
 @click.option("--n-splits", type=click.IntRange(min=1), default=1)
-@click.option("--null/--no-null", default=False)
 @click.option(
-    "--n-iter-null",
-    type=click.IntRange(min=1),
+    "--null",
+    "n_iter_null",
+    type=click.IntRange(min=0),
     default=DEFAULT_N_ITER_NULL,
     help="Number of iterations for null data",
 )

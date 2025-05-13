@@ -1,11 +1,13 @@
 from fedbiomed.common.training_plans import FedSGDClassifier, FedSGDRegressor
 
-from fl_pd.training_plans.mixins import TrainingPlanMixin
+from fl_pd.training_plans.mixins import DataLoaderMixin, AdamOptimizerMixin
 
 
-class SklearnClassifierTrainingPlan(TrainingPlanMixin, FedSGDClassifier):
+class SklearnClassifierTrainingPlan(
+    DataLoaderMixin, AdamOptimizerMixin, FedSGDClassifier
+):
     pass
 
 
-class SklearnRegressorTrainingPlan(TrainingPlanMixin, FedSGDRegressor):
+class SklearnRegressorTrainingPlan(DataLoaderMixin, FedSGDRegressor):
     pass
