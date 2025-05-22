@@ -15,7 +15,15 @@ import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
+from fl_pd.federation import (
+    average_params,
+    get_fitted_params,
+    get_initial_params,
+    set_params,
+)
 from fl_pd.io import load_Xy
 from fl_pd.metrics import get_metrics_map
 from fl_pd.utils.constants import (
@@ -168,7 +176,10 @@ class SklearnWorkflow:
         return Xy_test_all, n_features, n_targets
 
     def get_model(self):
-        return MODEL_MAP[self.target](random_state=self.random_state)
+        # return MODEL_MAP[self.target](random_state=self.random_state)
+        return make_pipeline(
+            StandardScaler(), MODEL_MAP[self.target](random_state=self.random_state)
+        )
 
     def get_results(
         self,
@@ -185,63 +196,37 @@ class SklearnWorkflow:
 
         if setup == MlSetup.FEDERATED:
 
-            if isinstance(self.model, Ridge):
-                # shape (n_features,) or (n_targets, n_features)
-                coef_shape = (
-                    (n_features,) if n_targets == 1 else (n_targets, n_features)
-                )
-                intercept_shape = (n_targets,)
-            elif isinstance(self.model, LogisticRegression):
-                # shape (1, n_features) or (n_classes, n_features)
-                coef_shape = (1, n_features)  # multiclass not implemented
-                intercept_shape = (1,)
-
-            avg_coef = np.zeros(coef_shape)
-            avg_intercept = np.zeros(intercept_shape)
+            initial_params = get_initial_params(
+                self.model,
+                n_features,
+                n_targets,
+                classes=[0, 1] if self.problem == MlProblem.CLASSIFICATION else None,
+            )
+            params = initial_params
 
             for _ in range(self.n_rounds):
-                models = []
+                fitted_params = []
                 n_samples = []
                 for dataset in self.test_datasets:
                     X_train, y_train = self.get_train_data(
                         i_split=i_split, null=null, setup=setup, dataset=dataset
                     )
 
-                    model: Ridge | LogisticRegression = clone(self.model)
-                    model.coef_ = avg_coef
-                    model.intercept_ = avg_intercept
+                    model = clone(self.model)
+                    set_params(model, params)
 
                     model.fit(X_train, y_train)
 
-                    models.append(model)
+                    fitted_params.append(get_fitted_params(model))
                     n_samples.append(X_train.shape[0])
 
                 weights = np.array(n_samples) / np.sum(n_samples)
-                if self.problem == MlProblem.REGRESSION:
-                    keepdims = False
-                else:
-                    keepdims = True
-
-                avg_coef = np.average(
-                    np.vstack([model.coef_ for model in models]),
-                    axis=0,
-                    weights=weights,
-                    keepdims=keepdims,
-                )
-                avg_intercept = np.average(
-                    np.vstack([model.intercept_ for model in models]),
-                    axis=0,
-                    weights=weights,
-                    keepdims=False,
-                )
+                params = average_params(fitted_params, weights=weights)
 
             # final model
             model = clone(self.model)
-            model.coef_ = avg_coef
-            model.intercept_ = avg_intercept
-
-            if isinstance(model, LogisticRegression):
-                model.classes_ = np.array([0, 1])
+            set_params(model, initial_params)
+            set_params(model, params)
 
         else:
             X_train, y_train = self.get_train_data(
