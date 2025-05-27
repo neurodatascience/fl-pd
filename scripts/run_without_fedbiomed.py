@@ -213,6 +213,7 @@ class SklearnWorkflow:
                     )
 
                     model = clone(self.model)
+                    set_params(model, initial_params)
                     set_params(model, params)
 
                     model.fit(X_train, y_train)
@@ -379,14 +380,14 @@ class SklearnWorkflow:
     "--sloppy", is_flag=True, help="Run Fed-BioMed as fast as possible (for testing)"
 )
 @click.option("--overwrite", is_flag=True, help="Overwrite existing results files")
-def run_fedbiomed(**params):
+def run_without_fedbiomed(**params):
     workflow = SklearnWorkflow(**params)
     workflow.run()
 
 
 if __name__ == "__main__":
     try:
-        run_fedbiomed()
+        run_without_fedbiomed()
     except KnownError as exception:
         click.echo(click.style(f"ERROR: {exception}", fg="red", bold=True))
         sys.exit(1)
