@@ -173,6 +173,11 @@ class SklearnWorkflow:
 
             Xy_test_all[col_dataset] = (X_test, y_test)
 
+        Xy_test_all["-".join(sorted(Xy_test_all.keys()))] = (
+            pd.concat([X for X, _ in Xy_test_all.values()], axis="index"),
+            pd.concat([y for _, y in Xy_test_all.values()], axis="index"),
+        )
+
         return Xy_test_all, n_features, n_targets
 
     def get_model(self):
@@ -187,7 +192,7 @@ class SklearnWorkflow:
         i_iter: int,
         null: bool,
         setup: MlSetup,
-        test_datasets_subset: Iterable[str],
+        train_dataset: str,
         dataset: Optional[str] = None,
     ) -> Generator[dict, None, None]:
         Xy_test_all, n_features, n_targets = self.get_test_data(
@@ -239,7 +244,7 @@ class SklearnWorkflow:
 
         # evaluate
         metrics_map = get_metrics_map(self.problem)
-        for test_dataset in test_datasets_subset:
+        for test_dataset in Xy_test_all.keys():
             X_test, y_test = Xy_test_all[test_dataset]
 
             y_pred = model.predict(X_test)
@@ -249,7 +254,7 @@ class SklearnWorkflow:
                     "setup": setup.value,
                     "problem": self.problem.value,
                     "target": self.target.value,
-                    # for silo, the test dataset is also the train dataset
+                    "train_dataset": train_dataset,
                     "test_dataset": test_dataset,
                     "is_null": null,
                     "metric": metric_name,
@@ -276,7 +281,7 @@ class SklearnWorkflow:
                                     null=null,
                                     setup=setup,
                                     dataset=dataset,
-                                    test_datasets_subset=[dataset],
+                                    train_dataset=dataset,
                                 )
                             )
                     else:
@@ -286,7 +291,7 @@ class SklearnWorkflow:
                                 i_iter=i_iter,
                                 null=null,
                                 setup=setup,
-                                test_datasets_subset=self.test_datasets,
+                                train_dataset="-".join(sorted(self.test_datasets)),
                             )
                         )
 
