@@ -16,6 +16,7 @@ ML_TARGET_TO_PROBLEM_MAP = {
     MlTarget.MMSE: MlProblem.REGRESSION,
     MlTarget.DIAGNOSIS: MlProblem.CLASSIFICATION,
     MlTarget.AGE: MlProblem.REGRESSION,
+    MlTarget.COG_DECLINE: MlProblem.CLASSIFICATION,
 }
 
 
