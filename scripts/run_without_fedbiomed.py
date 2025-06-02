@@ -14,7 +14,7 @@ from matplotlib.pylab import f
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
-from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.linear_model import LogisticRegression, Ridge, SGDClassifier, SGDRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -49,6 +49,14 @@ MODEL_MAP = {
         LogisticRegression, class_weight="balanced", warm_start=True, solver="lbfgs"
     ),
     MlTarget.MMSE: partial(Ridge),
+    # MlTarget.AGE: partial(SGDRegressor, warm_start=True),
+    # MlTarget.COG_DECLINE: partial(
+    #     SGDClassifier, class_weight="balanced", warm_start=True
+    # ),
+    # MlTarget.DIAGNOSIS: partial(
+    #     SGDClassifier, class_weight="balanced", warm_start=True
+    # ),
+    # MlTarget.MMSE: partial(SGDRegressor, warm_start=True),
 }
 
 warnings.filterwarnings(action="ignore", message="X has feature names")

@@ -1,14 +1,14 @@
 from typing import Any
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.linear_model import LogisticRegression, Ridge, SGDRegressor, SGDClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 
 def get_initial_params(model, n_features, n_targets, classes=None) -> dict[str, Any]:
 
-    if isinstance(model, Ridge):
+    if isinstance(model, (Ridge, SGDRegressor)):
         # shape (n_features,) or (n_targets, n_features)
         return {
             "coef_": np.zeros(
@@ -16,10 +16,10 @@ def get_initial_params(model, n_features, n_targets, classes=None) -> dict[str, 
             ),
             "intercept_": np.zeros((n_targets,)),
         }
-    elif isinstance(model, LogisticRegression):
+    elif isinstance(model, (LogisticRegression, SGDClassifier)):
         # shape (1, n_features) or (n_classes, n_features)
         if classes is None:
-            raise ValueError("classes must be provided for LogisticRegression")
+            raise ValueError("classes must be provided for classifier models")
         return {
             "coef_": np.zeros((1, n_features)),
             "intercept_": np.zeros((1,)),
@@ -44,6 +44,8 @@ def get_initial_params(model, n_features, n_targets, classes=None) -> dict[str, 
                 }
             )
         return params
+    else:
+        raise ValueError(f"Unsupported model type: {type(model)}")
 
 
 def get_fitted_params(model) -> dict[str, Any]:
@@ -58,10 +60,12 @@ def get_fitted_params(model) -> dict[str, Any]:
             )
         return params
     else:
-        if isinstance(model, (Ridge, LogisticRegression)):
+        if isinstance(model, (LogisticRegression, Ridge, SGDClassifier, SGDRegressor)):
             param_names = ["coef_", "intercept_"]
         elif isinstance(model, StandardScaler):
             param_names = ["mean_", "scale_"]
+        else:
+            raise ValueError(f"Unsupported model type: {type(model)}")
         return {name: getattr(model, name) for name in param_names}
 
 
