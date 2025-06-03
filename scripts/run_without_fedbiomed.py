@@ -43,10 +43,18 @@ DEFAULT_N_ITER_NULL = 1
 MODEL_MAP = {
     MlTarget.AGE: partial(Ridge),
     MlTarget.COG_DECLINE: partial(
-        LogisticRegression, class_weight="balanced", warm_start=True, solver="lbfgs"
+        LogisticRegression,
+        max_iter=1000,
+        class_weight="balanced",
+        warm_start=True,
+        solver="lbfgs",
     ),
     MlTarget.DIAGNOSIS: partial(
-        LogisticRegression, class_weight="balanced", warm_start=True, solver="lbfgs"
+        LogisticRegression,
+        max_iter=1000,
+        class_weight="balanced",
+        warm_start=True,
+        solver="lbfgs",
     ),
     MlTarget.MMSE: partial(Ridge),
     # MlTarget.AGE: partial(SGDRegressor, warm_start=True),
@@ -189,10 +197,10 @@ class SklearnWorkflow:
         return Xy_test_all, n_features, n_targets
 
     def get_model(self):
-        # return MODEL_MAP[self.target](random_state=self.random_state)
-        return make_pipeline(
-            StandardScaler(), MODEL_MAP[self.target](random_state=self.random_state)
-        )
+        return MODEL_MAP[self.target](random_state=self.random_state)
+        # return make_pipeline(
+        #     StandardScaler(), MODEL_MAP[self.target](random_state=self.random_state)
+        # )
 
     def get_results(
         self,

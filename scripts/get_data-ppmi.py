@@ -6,6 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 
+from fl_pd.normative_modelling import get_z_scores
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
 from fl_pd.utils.freesurfer import (
     fs6_to_fs7,
@@ -16,25 +17,7 @@ from fl_pd.utils.freesurfer import (
 VISIT_IDS_ORDERED = ["SC", "BL", "V04", "V06", "V08", "V10"]
 
 
-def get_df_pheno(
-    fpath_pheno,
-    include_decline=True,
-    include_age=True,
-    include_sex=False,
-    include_diag=False,
-    include_cases=True,
-    include_controls=False,
-):
-    # other cols: "EDUCATION", "MOCA"
-    cols = []
-    if include_decline:
-        cols.append("COG_DECLINE")
-    if include_age:
-        cols.append("AGE")
-    if include_sex:
-        cols.append("SEX")
-    if include_diag:
-        cols.append("DIAGNOSIS")
+def get_df_pheno(fpath_pheno):
 
     # load
     df_pheno = pd.read_csv(
@@ -52,7 +35,6 @@ def get_df_pheno(
     )
 
     # recode diagnosis
-    # NOTE for diagnosis we consider prodromal to be non-PD
     df_pheno["DIAGNOSIS"] = (
         df_pheno["COHORT_DEFINITION"]
         .map({"Healthy Control": 0, "Parkinson's Disease": 1, "Prodromal": 0})
@@ -66,14 +48,6 @@ def get_df_pheno(
     # convert to categorical
     for col in ["SEX", "COHORT_DEFINITION", "PRIMARY_DIAGNOSIS"]:
         df_pheno[col] = df_pheno[col].astype("category")
-
-    # keep PD patients + prodromal
-    if not include_controls:
-        df_pheno = df_pheno.query(
-            'COHORT_DEFINITION == "Parkinson\'s Disease" or COHORT_DEFINITION == "Prodromal"'
-        )
-    if not include_cases:
-        df_pheno = df_pheno.query('COHORT_DEFINITION == "Healthy Control"')
 
     # determine cognitive decline
     # criterion: drop of >4 from first visit to any of the follow-ups
@@ -120,44 +94,44 @@ def get_df_pheno(
             sc_val = sc_row[col].item()
             df_pheno.loc[idx, col] = sc_val
 
-    print(f"Keeping phenotypic columns: {cols}")
-    return df_pheno[cols]
+    return df_pheno
 
 
 def get_df_imaging(
-    fpath_imaging,
+    fpath_aseg,
+    fpath_aparc,
     include_aparc=True,
     include_aseg=False,
     is_fs6=False,
 ):
 
-    df_imaging = pd.read_csv(fpath_imaging, sep="\t", dtype={"participant_id": str})
-    df_imaging = df_imaging.set_index(["participant_id", "session_id"])
+    df_aseg = pd.read_csv(fpath_aseg, sep="\t", dtype={"participant_id": str})
+    df_aseg = df_aseg.set_index(["participant_id", "session_id"])
+
+    df_aparc = pd.read_csv(fpath_aparc, sep="\t", dtype={"participant_id": str})
+    df_aparc = df_aparc.set_index(["participant_id", "session_id"])
 
     if is_fs6:
-        df_imaging = fs6_to_fs7(df_imaging)
+        df_aseg = fs6_to_fs7(df_aseg)
+        df_aparc = fs6_to_fs7(df_aparc)
 
-    df_aparc = df_imaging.drop(
-        columns=[col for col in df_imaging.columns if "thickness" not in col],
-    )
-    df_aparc = fs7_aparc_to_keep(df_aparc)
-    df_aseg = df_imaging.drop(
-        columns=[col for col in df_imaging.columns if "thickness" in col],
-    )
     df_aseg = fs7_aseg_to_keep(df_aseg)
+    df_aparc = fs7_aparc_to_keep(df_aparc)
 
     dfs_imaging = []
-    if include_aparc:
-        dfs_imaging.append(df_aparc)
     if include_aseg:
         dfs_imaging.append(df_aseg)
+    if include_aparc:
+        dfs_imaging.append(df_aparc)
 
     return pd.concat(dfs_imaging, axis="columns")
 
 
 def get_df_ppmi(
     fpath_pheno,
-    fpath_imaging,
+    fpath_aseg,
+    fpath_aparc,
+    dpath_normative_modelling_data,
     include_decline=True,
     include_age=True,
     include_sex=False,
@@ -167,36 +141,61 @@ def get_df_ppmi(
     include_aparc=True,
     include_aseg=False,
     is_fs6=False,
+    apply_normative_modelling=False,
 ):
-    df_pheno = get_df_pheno(
-        fpath_pheno,
-        include_decline=include_decline,
-        include_age=include_age,
-        include_sex=include_sex,
-        include_cases=include_cases,
-        include_controls=include_controls,
-        include_diag=include_diag,
-    )
+    cols = []
+    if include_decline:
+        cols.append("COG_DECLINE")
+    if include_age:
+        cols.append("AGE")
+    if include_sex:
+        cols.append("SEX")
+    if include_diag:
+        cols.append("DIAGNOSIS")
+
+    df_pheno_full = get_df_pheno(fpath_pheno)
+    df_pheno = df_pheno_full.copy()
+
+    # keep PD patients + prodromal
+    if not include_controls:
+        df_pheno = df_pheno.query(
+            'COHORT_DEFINITION == "Parkinson\'s Disease" or COHORT_DEFINITION == "Prodromal"'
+        )
+    if not include_cases:
+        df_pheno = df_pheno.query('COHORT_DEFINITION == "Healthy Control"')
+    print(f"Keeping phenotypic columns: {cols}")
+    df_pheno = df_pheno[cols]
+
     df_imaging = get_df_imaging(
-        fpath_imaging,
+        fpath_aseg,
+        fpath_aparc,
         include_aparc=include_aparc,
         include_aseg=include_aseg,
         is_fs6=is_fs6,
     )
+    df_imaging.index.names = df_pheno.index.names
 
     # merge
     df_pheno.index = df_pheno.index.rename(df_imaging.index.names)
     if include_aparc or include_aseg:
+        if apply_normative_modelling:
+            df_merged_full = df_pheno_full.loc[:, ["AGE", "SEX", "DIAGNOSIS"]].merge(
+                df_imaging, left_index=True, right_index=True, how="right"
+            )
+            df_imaging = get_z_scores(
+                df_merged_full.drop(columns=["DIAGNOSIS"]),
+                df_merged_full.query("DIAGNOSIS == 0").drop(columns=["DIAGNOSIS"]),
+                dpath_normative_modelling_data,
+            )
         df_merged = df_pheno.merge(
             df_imaging, left_index=True, right_index=True, how="inner"
         )
+
     else:
         df_merged = df_pheno
 
     # keep only BL
-    df_merged = df_merged.query('session_id == "BL"').reset_index(
-        "session_id", drop=True
-    )
+    df_merged = df_merged.query('visit_id == "BL"').reset_index("visit_id", drop=True)
 
     return df_merged
 
@@ -208,9 +207,19 @@ def get_df_ppmi(
     envvar="FPATH_PPMI_PHENO",
 )
 @click.argument(
-    "fpath_imaging",
+    "fpath_aseg",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PPMI_IMAGING",
+    envvar="FPATH_PPMI_ASEG",
+)
+@click.argument(
+    "fpath_aparc",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    envvar="FPATH_PPMI_APARC",
+)
+@click.argument(
+    "dpath_normative_modelling_data",
+    type=click.Path(path_type=Path, writable=True),
+    envvar="DPATH_NORMATIVE_MODELLING_DATA",
 )
 @click.argument(
     "dpath_out",
@@ -227,14 +236,23 @@ def get_df_ppmi(
 @click.option("--aseg/--no-aseg", "include_aseg", default=False)
 @click.option("--fs6/--fs7", "use_fs6", default=False)
 @click.option(
-    "--fpath-imaging-fs6",
+    "--fpath-aseg-fs6",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
     required=False,
-    envvar="FPATH_PPMI_IMAGING_FS6",
+    envvar="FPATH_PPMI_ASEG_FS6",
 )
+@click.option(
+    "--fpath-aparc-fs6",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=False,
+    envvar="FPATH_PPMI_APARC_FS6",
+)
+@click.option("--norm/--no-norm", "apply_normative_modelling", default=False)
 def get_data_ppmi(
     fpath_pheno: Path,
-    fpath_imaging: Path,
+    fpath_aseg: Path,
+    fpath_aparc: Path,
+    dpath_normative_modelling_data: Path,
     dpath_out: Path,
     include_decline=True,
     include_age=True,
@@ -244,11 +262,13 @@ def get_data_ppmi(
     include_controls=False,
     include_aparc=True,
     include_aseg=False,
-    fpath_imaging_fs6=None,
+    fpath_aseg_fs6=None,
+    fpath_aparc_fs6=None,
     use_fs6=False,
+    apply_normative_modelling=False,
 ):
 
-    if use_fs6 and fpath_imaging_fs6 is None:
+    if use_fs6 and fpath_aseg_fs6 is None:
         raise ValueError("Must provide path to FS6 imaging data if --fs6 is given")
 
     fname_data_out_components = ["ppmi"]
@@ -265,12 +285,19 @@ def get_data_ppmi(
     if include_controls:
         fname_data_out_components.append("hc")
     if include_aparc:
-        fname_data_out_components.append("aparc")
+        if apply_normative_modelling:
+            fname_data_out_components.append("aparc_norm")
+        else:
+            fname_data_out_components.append("aparc")
     if include_aseg:
-        fname_data_out_components.append("aseg")
+        if apply_normative_modelling:
+            fname_data_out_components.append("aseg_norm")
+        else:
+            fname_data_out_components.append("aseg")
 
     if use_fs6:
-        fpath_imaging = fpath_imaging_fs6
+        fpath_aseg = fpath_aseg_fs6
+        fpath_aparc = fpath_aparc_fs6
         fname_data_out_components.append("fs6")
 
     dpath_out.mkdir(exist_ok=True)
@@ -278,8 +305,10 @@ def get_data_ppmi(
     fpath_data_out = (dpath_out / tags / tags).with_suffix(".tsv")
 
     df_ppmi = get_df_ppmi(
-        fpath_pheno,
-        fpath_imaging,
+        fpath_pheno=fpath_pheno,
+        fpath_aseg=fpath_aseg,
+        fpath_aparc=fpath_aparc,
+        dpath_normative_modelling_data=dpath_normative_modelling_data,
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
@@ -289,6 +318,7 @@ def get_data_ppmi(
         include_aparc=include_aparc,
         include_aseg=include_aseg,
         is_fs6=use_fs6,
+        apply_normative_modelling=apply_normative_modelling,
     )
     if df_ppmi.empty:
         raise ValueError("Empty dataset")

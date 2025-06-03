@@ -6,6 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 
+from fl_pd.normative_modelling import get_z_scores
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
 from fl_pd.utils.freesurfer import (
     fs6_to_fs7,
@@ -14,25 +15,7 @@ from fl_pd.utils.freesurfer import (
 )
 
 
-def get_df_pheno(
-    fpath_pheno,
-    include_decline=True,
-    include_age=True,
-    include_sex=False,
-    include_diag=False,
-    include_cases=True,
-    include_controls=False,
-):
-
-    cols = []
-    if include_decline:
-        cols.append("COG_DECLINE")
-    if include_age:
-        cols.append("AGE")
-    if include_sex:
-        cols.append("SEX")
-    if include_diag:
-        cols.append("DIAGNOSIS")
+def get_df_pheno(fpath_pheno):
 
     df_pheno = pd.read_csv(fpath_pheno, low_memory=False)
     df_pheno["participant_id"] = "ADNI" + df_pheno["PTID"].str.replace("_", "")
@@ -102,33 +85,23 @@ def get_df_pheno(
 
     df_pheno = df_pheno.query('VISCODE == "bl"')
 
-    if not include_controls:
-        df_pheno = df_pheno.query("DX_bl != 'CN'")
-    if not include_cases:
-        df_pheno = df_pheno.query("DX_bl == 'CN'")
-
-    df_pheno = df_pheno[cols]
-    print(f"Keeping phenotypic columns: {cols}")
-
     return df_pheno
 
 
 def get_df_imaging(
-    fpath_imaging,
+    fpath_aseg,
+    fpath_aparc,
     include_aparc=True,
     include_aseg=False,
 ):
-    df_imaging = pd.read_csv(fpath_imaging, sep="\t", dtype={"participant_id": str})
-    df_imaging = df_imaging.set_index(["participant_id", "session_id"])
-    df_imaging = fs6_to_fs7(df_imaging)
-
-    df_aparc = df_imaging.drop(
-        columns=[col for col in df_imaging.columns if "thickness" not in col],
-    )
+    df_aparc = pd.read_csv(fpath_aparc, sep="\t", dtype={"participant_id": str})
+    df_aparc = df_aparc.set_index(["participant_id", "session_id"])
+    df_aparc = fs6_to_fs7(df_aparc)
     df_aparc = fs7_aparc_to_keep(df_aparc)
-    df_aseg = df_imaging.drop(
-        columns=[col for col in df_imaging.columns if "thickness" in col],
-    )
+
+    df_aseg = pd.read_csv(fpath_aseg, sep="\t", dtype={"participant_id": str})
+    df_aseg = df_aseg.set_index(["participant_id", "session_id"])
+    df_aseg = fs6_to_fs7(df_aseg)
     df_aseg = fs7_aseg_to_keep(df_aseg)
 
     dfs_imaging = []
@@ -137,17 +110,17 @@ def get_df_imaging(
     if include_aseg:
         dfs_imaging.append(df_aseg)
 
-    df_imaging = pd.concat(dfs_imaging, axis="columns")
-    df_imaging = df_imaging.query('session_id == "bl"').reset_index(
-        "session_id", drop=True
-    )
+    df_aparc = pd.concat(dfs_imaging, axis="columns")
+    df_aparc = df_aparc.query('session_id == "bl"').reset_index("session_id", drop=True)
 
-    return df_imaging
+    return df_aparc
 
 
 def get_df_adni(
     fpath_pheno,
-    fpath_imaging,
+    fpath_aseg,
+    fpath_aparc,
+    dpath_normative_modelling_data: Path,
     include_decline=True,
     include_age=True,
     include_sex=False,
@@ -156,22 +129,44 @@ def get_df_adni(
     include_controls=False,
     include_aparc=True,
     include_aseg=False,
+    apply_normative_modelling=False,
 ):
-    df_pheno = get_df_pheno(
-        fpath_pheno,
-        include_decline=include_decline,
-        include_age=include_age,
-        include_sex=include_sex,
-        include_diag=include_diag,
-        include_cases=include_cases,
-        include_controls=include_controls,
-    )
+    cols = []
+    if include_decline:
+        cols.append("COG_DECLINE")
+    if include_age:
+        cols.append("AGE")
+    if include_sex:
+        cols.append("SEX")
+    if include_diag:
+        cols.append("DIAGNOSIS")
+
+    df_pheno_full = get_df_pheno(fpath_pheno)
+
+    df_pheno = df_pheno_full
+    if not include_controls:
+        df_pheno = df_pheno.query("DIAGNOSIS == 0")
+    if not include_cases:
+        df_pheno = df_pheno.query("DIAGNOSIS == 1")
+    df_pheno = df_pheno_full.loc[:, cols]
+    print(f"Keeping phenotypic columns: {cols}")
+
     df_imaging = get_df_imaging(
-        fpath_imaging,
+        fpath_aseg,
+        fpath_aparc,
         include_aparc=include_aparc,
         include_aseg=include_aseg,
     )
     if include_aparc or include_aseg:
+        if apply_normative_modelling:
+            df_merged_full = df_pheno_full.loc[:, ["AGE", "SEX", "DIAGNOSIS"]].join(
+                df_imaging, how="inner"
+            )
+            df_imaging = get_z_scores(
+                df_merged_full.drop(columns=["DIAGNOSIS"]),
+                df_merged_full.query("DIAGNOSIS == 0").drop(columns=["DIAGNOSIS"]),
+                dpath_normative_modelling_data,
+            )
         df_merged = df_pheno.join(df_imaging, how="inner")
     else:
         df_merged = df_pheno
@@ -187,9 +182,19 @@ def get_df_adni(
     envvar="FPATH_ADNI_PHENO",
 )
 @click.argument(
-    "fpath_imaging",
+    "fpath_aseg",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_ADNI_IMAGING",
+    envvar="FPATH_ADNI_ASEG",
+)
+@click.argument(
+    "fpath_aparc",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    envvar="FPATH_ADNI_APARC",
+)
+@click.argument(
+    "dpath_normative_modelling_data",
+    type=click.Path(path_type=Path, writable=True),
+    envvar="DPATH_NORMATIVE_MODELLING_DATA",
 )
 @click.argument(
     "dpath_out",
@@ -204,9 +209,12 @@ def get_df_adni(
 @click.option("--controls/--no-controls", "include_controls", default=False)
 @click.option("--aparc/--no-aparc", "include_aparc", default=True)
 @click.option("--aseg/--no-aseg", "include_aseg", default=False)
+@click.option("--norm/--no-norm", "apply_normative_modelling", default=False)
 def get_data_adni(
     fpath_pheno: Path,
-    fpath_imaging: Path,
+    fpath_aseg: Path,
+    fpath_aparc: Path,
+    dpath_normative_modelling_data: Path,
     dpath_out: Path,
     include_decline=True,
     include_age=True,
@@ -216,6 +224,7 @@ def get_data_adni(
     include_controls=False,
     include_aparc=True,
     include_aseg=False,
+    apply_normative_modelling=False,
 ):
 
     fname_data_out_components = ["adni"]
@@ -232,16 +241,24 @@ def get_data_adni(
     if include_controls:
         fname_data_out_components.append("hc")
     if include_aparc:
-        fname_data_out_components.append("aparc")
+        if apply_normative_modelling:
+            fname_data_out_components.append("aparc_norm")
+        else:
+            fname_data_out_components.append("aparc")
     if include_aseg:
-        fname_data_out_components.append("aseg")
+        if apply_normative_modelling:
+            fname_data_out_components.append("aseg_norm")
+        else:
+            fname_data_out_components.append("aseg")
     dpath_out.mkdir(exist_ok=True)
     tags = "-".join(fname_data_out_components)
     fpath_data_out = (dpath_out / tags / tags).with_suffix(".tsv")
 
     df_adni = get_df_adni(
         fpath_pheno=fpath_pheno,
-        fpath_imaging=fpath_imaging,
+        fpath_aseg=fpath_aseg,
+        fpath_aparc=fpath_aparc,
+        dpath_normative_modelling_data=dpath_normative_modelling_data,
         include_decline=include_decline,
         include_age=include_age,
         include_sex=include_sex,
@@ -250,6 +267,7 @@ def get_data_adni(
         include_controls=include_controls,
         include_aparc=include_aparc,
         include_aseg=include_aseg,
+        apply_normative_modelling=apply_normative_modelling,
     )
     if df_adni.empty:
         raise ValueError("Empty dataset")

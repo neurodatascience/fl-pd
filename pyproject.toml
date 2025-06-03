@@ -97,7 +97,6 @@ classifiers = [
 dependencies = [
     "click",
     "python-dotenv",
-    "fedbiomed[node,researcher]",
     "ipykernel",
     "matplotlib",
     "numpy",
@@ -118,6 +117,12 @@ dependencies = [
 # referred to as "extras". For a more extensive definition see:
 # https://packaging.python.org/en/latest/specifications/dependency-specifiers/#extras
 [project.optional-dependencies]
+fedbiomed = [
+  "fedbiomed[node,researcher]",
+]
+pcntoolkit = [
+  "pcntoolkit",
+]
 
 # List URLs that are relevant to your project
 #
