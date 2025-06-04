@@ -6,12 +6,11 @@ import click
 import numpy as np
 import pandas as pd
 
-from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs6_to_fs7, fs7_aparc_to_keep, fs7_aseg_to_keep
 
 
 def get_df_pheno(fpath_pheno):
-    cols = ["COG_DECLINE", "AGE", "SEX", "DIAGNOSIS", "IS_CONTROL"]
 
     df_pheno = pd.read_csv(fpath_pheno, low_memory=False)
     df_pheno["participant_id"] = "ADNI" + df_pheno["PTID"].str.replace("_", "")
@@ -87,7 +86,7 @@ def get_df_pheno(fpath_pheno):
 
     df_pheno = df_pheno.query('VISCODE == "bl"')
 
-    df_pheno = df_pheno.loc[:, cols]
+    df_pheno = df_pheno.loc[:, COLS_PHENO]
 
     print(f"Using {df_pheno.shape[1]} phenotypic features")
 

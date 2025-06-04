@@ -1,4 +1,4 @@
-def fs6_to_fs7(df_fs6, parcellation="a2009s"):
+def fs6_to_fs7(df_fs6, parcellation=""):
 
     # aparc
     if parcellation == "DKTatlas":
@@ -8,6 +8,11 @@ def fs6_to_fs7(df_fs6, parcellation="a2009s"):
         )
     elif parcellation == "a2009s":
         df_fs6 = df_fs6.rename(columns=lambda x: x.replace("&", "_and_"))
+    elif parcellation == "":
+        df_fs6 = df_fs6.drop(
+            columns=["BrainSegVolNotVentSurf", "BrainSegVolNotVent", "eTIV"],
+            errors="ignore",
+        )
     else:
         raise ValueError(f"Invalid parcellation: {parcellation}")
 
@@ -22,27 +27,37 @@ def fs6_to_fs7(df_fs6, parcellation="a2009s"):
     return df_fs6
 
 
-def fs7_to_fs6(df_fs7, parcellation="a2009s"):
+def fs_to_pcn(df_fs, parcellation=""):
+    def _fs_to_pcn_DK(idp_name: str):
+        if not idp_name.endswith("MeanThickness_thickness"):
+            idp_name = idp_name.removesuffix("_thickness")
+            if idp_name.startswith("lh_"):
+                idp_name = f"L_{idp_name.removeprefix('lh_')}"
+            elif idp_name.startswith("rh_"):
+                idp_name = f"R_{idp_name.removeprefix('rh_')}"
+        return idp_name
+
     # aparc
-    if parcellation == "DKTatlas":
-        # FS7 is subset of FS6 for DKTatlas
-        pass
-    elif parcellation == "a2009s":
-        df_fs7 = df_fs7.rename(columns=lambda x: x.replace("_and_", "&"))
+    if parcellation == "a2009s":
+        # FS7 to FS6
+        df_fs = df_fs.rename(columns=lambda x: x.replace("_and_", "&"))
+    elif parcellation == "":
+        # PCN naming is different from FS6?
+        df_fs = df_fs.rename(columns=_fs_to_pcn_DK)
     else:
         raise ValueError(f"Invalid parcellation: {parcellation}")
 
     # aseg
-    df_fs7 = df_fs7.rename(
+    df_fs = df_fs.rename(
         columns={
             "Left-Thalamus": "Left-Thalamus-Proper",
             "Right-Thalamus": "Right-Thalamus-Proper",
         }
     )
-    return df_fs7
+    return df_fs
 
 
-def fs7_aparc_to_keep(df_fs7, parcellation="a2009s"):
+def fs7_aparc_to_keep(df_fs7, parcellation=""):
     if parcellation == "DKTatlas":
         df_fs7 = df_fs7.drop(
             columns=[
@@ -52,6 +67,8 @@ def fs7_aparc_to_keep(df_fs7, parcellation="a2009s"):
             ],
         )
     elif parcellation == "a2009s":
+        pass
+    elif parcellation == "":
         pass
     else:
         raise ValueError(f"Invalid parcellation: {parcellation}")

@@ -6,7 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 
-from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs7_aparc_to_keep, fs7_aseg_to_keep
 
 VISIT_IDS_ORDERED = [
@@ -18,7 +18,6 @@ VISIT_IDS_ORDERED = [
 
 
 def get_df_pheno(fpath_demographics, fpath_age, fpath_diagnosis, fpath_moca):
-    cols = ["COG_DECLINE", "AGE", "SEX", "DIAGNOSIS", "IS_CONTROL"]
 
     df_demographics = pd.read_csv(fpath_demographics).set_index("participant_id")
     df_age = (
@@ -89,7 +88,7 @@ def get_df_pheno(fpath_demographics, fpath_age, fpath_diagnosis, fpath_moca):
         lambda x: x <= -3 if not np.isnan(x) else np.nan
     )
 
-    df_pheno = df_pheno[cols]
+    df_pheno = df_pheno[COLS_PHENO]
     print(f"Using {df_pheno.shape[1]} phenotypic features")
 
     return df_pheno

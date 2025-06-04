@@ -6,15 +6,13 @@ import click
 import numpy as np
 import pandas as pd
 
-from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
+from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs6_to_fs7, fs7_aparc_to_keep, fs7_aseg_to_keep
 
 VISIT_IDS_ORDERED = ["SC", "BL", "V04", "V06", "V08", "V10"]
 
 
 def get_df_pheno(fpath_pheno) -> pd.DataFrame:
-
-    cols = ["COG_DECLINE", "AGE", "SEX", "DIAGNOSIS", "IS_CONTROL"]
 
     # load
     df_pheno = pd.read_csv(
@@ -103,7 +101,7 @@ def get_df_pheno(fpath_pheno) -> pd.DataFrame:
     # keep only BL
     df_pheno = df_pheno.query('visit_id == "BL"').reset_index("visit_id", drop=True)
 
-    df_pheno = df_pheno[cols]
+    df_pheno = df_pheno[COLS_PHENO]
     print(f"Using {df_pheno.shape[1]} phenotypic features")
 
     return df_pheno

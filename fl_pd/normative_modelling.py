@@ -3,7 +3,7 @@ import tempfile
 import warnings
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,40 @@ except ImportError:
         "in a separate environment."
     )
 
-from fl_pd.utils.freesurfer import fs7_to_fs6
+from fl_pd.utils.freesurfer import fs_to_pcn
+from fl_pd.utils.constants import (
+    COLS_PHENO,
+    PCN_MODEL_INFO_A2009S_ASEG,
+    PCN_MODEL_INFO_DK,
+)
+
+
+def _get_all_site_ids(
+    dpath_normative_modelling_data: Path,
+    model_info_list: Iterable[Tuple[str, str]],
+) -> List[str]:
+    site_ids = []
+    for _, fname_site_ids_train in model_info_list:
+        fpath_training_sites = dpath_normative_modelling_data / fname_site_ids_train
+        site_ids_train = fpath_training_sites.read_text().splitlines()
+        site_ids.extend(site_ids_train)
+    return site_ids
+
+
+def _get_model_info(
+    idp_name: str,
+    dpath_normative_modelling_data: Path,
+    model_info_list: Iterable[Tuple[str, str]],
+) -> Tuple[Path, List[str]] | None:
+    for model_info in model_info_list:
+        dname_model, fname_site_ids_train = model_info
+        dpath_model = dpath_normative_modelling_data / dname_model / idp_name / "Models"
+        if dpath_model.exists():
+            return dpath_model, _get_all_site_ids(
+                dpath_normative_modelling_data=dpath_normative_modelling_data,
+                model_info_list=[model_info],
+            )
+    return None
 
 
 def get_z_scores(
@@ -28,8 +61,10 @@ def get_z_scores(
     cols_cov=("AGE", "SEX"),
     xmin=-5,
     xmax=110,
-    dname_model="lifespan_57K_82sites",
-    fname_site_ids_train="site_ids_ct_82sites.txt",
+    model_info_list: Iterable[Tuple[str, str]] = (
+        PCN_MODEL_INFO_A2009S_ASEG,
+        PCN_MODEL_INFO_DK,
+    ),
     site_id="NEW",
 ) -> pd.DataFrame:
     col_site = "site"
@@ -40,18 +75,21 @@ def get_z_scores(
     if set(df_full.columns) != set(df_adaptation.columns):
         raise ValueError("The columns of df_full and df_adaptation do not match")
 
-    fpath_training_sites = dpath_normative_modelling_data / fname_site_ids_train
-    site_ids_train = fpath_training_sites.read_text().splitlines()
+    site_ids_all = _get_all_site_ids(
+        dpath_normative_modelling_data=dpath_normative_modelling_data,
+        model_info_list=model_info_list,
+    )
 
     # treat entire dataframe as new site
-    df_full = fs7_to_fs6(df_full.copy())
-    df_adaptation = fs7_to_fs6(df_adaptation.copy())
-    if site_id in site_ids_train:
+    df_full = fs_to_pcn(df_full.copy())
+    cols_orig = df_full.columns
+    df_adaptation = fs_to_pcn(df_adaptation.copy())
+    if site_id in site_ids_all:
         raise ValueError(
             f"Site ID '{site_id}' is already in the training sites. "
             "Please choose a different site ID."
         )
-    sitenum = len(site_ids_train) + 1
+    sitenum = len(site_ids_all) + 1
     df_full[col_site] = site_id
     df_full[col_sitenum] = sitenum
     df_adaptation[col_site] = site_id
@@ -62,13 +100,17 @@ def get_z_scores(
         with working_directory(dpath_tmp):
             for idp_name in df_full.columns:
 
-                if (idp_name in cols_cov) or (idp_name in (col_site, col_sitenum)):
+                if (
+                    (idp_name in COLS_PHENO)
+                    or (idp_name in cols_cov)
+                    or (idp_name in (col_site, col_sitenum))
+                ):
                     continue
 
-                dpath_model = (
-                    dpath_normative_modelling_data / dname_model / idp_name / "Models"
+                dpath_model, site_ids_train = _get_model_info(
+                    idp_name, dpath_normative_modelling_data, model_info_list
                 )
-                if not dpath_model.exists():
+                if dpath_model is None:
                     warnings.warn(
                         f"Model directory {dpath_model} does not exist, skipping"
                     )
@@ -102,7 +144,7 @@ def get_z_scores(
 
     print(f"Successfully computed z-scores for {len(idps_success)} IDPs")
 
-    return df_full.loc[:, idps_success]
+    return df_full.loc[:, cols_orig]
 
 
 def _get_z_scores_for_idp(
