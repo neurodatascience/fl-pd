@@ -11,7 +11,7 @@ source config/.env
 ./scripts/get_data-qpn.py $FPATH_QPN_DEMOGRAPHICS $FPATH_QPN_AGE $FPATH_QPN_DIAGNOSIS $FPATH_QPN_MOCA $FPATH_QPN_ASEG $FPATH_QPN_APARC $DPATH_FL_DATA
 
 # extract columns
-./scripts/subåset_data.py --dropna COG_DECLINE --decline --age --sex --no-diag --cases --no-controls --aparc --no-aseg $DPATH_FL_DATA {adni,ppmi,qpn}
+./scripts/subset_data.py --dropna COG_DECLINE --decline --age --sex --no-diag --cases --no-controls --aparc --no-aseg $DPATH_FL_DATA {adni,ppmi,qpn}
 ./scripts/subset_data.py --dropna DIAGNOSIS --no-decline --age --sex --diag --cases --controls --aparc --aseg $DPATH_FL_DATA {adni,ppmi,qpn}
 ./scripts/subset_data.py --dropna AGE --no-decline --age --sex --no-diag --no-cases --controls --no-aparc --aseg $DPATH_FL_DATA {adni,ppmi,qpn}
 

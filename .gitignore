@@ -17,3 +17,6 @@ node*
 researcher
 fbm-researcher
 trained_model
+
+# SVG figures
+*.svg

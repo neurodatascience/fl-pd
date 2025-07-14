@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Generator, Iterable, Optional
 
 import click
-from matplotlib.pylab import f
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
@@ -197,10 +196,10 @@ class SklearnWorkflow:
         return Xy_test_all, n_features, n_targets
 
     def get_model(self):
-        return MODEL_MAP[self.target](random_state=self.random_state)
-        # return make_pipeline(
-        #     StandardScaler(), MODEL_MAP[self.target](random_state=self.random_state)
-        # )
+        # return MODEL_MAP[self.target](random_state=self.random_state)
+        return make_pipeline(
+            StandardScaler(), MODEL_MAP[self.target](random_state=self.random_state)
+        )
 
     def get_results(
         self,
