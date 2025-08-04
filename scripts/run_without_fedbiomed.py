@@ -13,7 +13,13 @@ import click
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
-from sklearn.linear_model import LogisticRegression, Ridge, SGDClassifier, SGDRegressor
+from sklearn.linear_model import (
+    LogisticRegression,
+    Ridge,
+    Lasso,
+    SGDClassifier,
+    SGDRegressor,
+)
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -40,6 +46,7 @@ DEFAULT_N_SPLITS = 1
 DEFAULT_N_ITER_NULL = 1
 
 MODEL_MAP = {
+    # Ridge
     MlTarget.AGE: partial(Ridge),
     MlTarget.COG_DECLINE: partial(
         LogisticRegression,
@@ -56,6 +63,26 @@ MODEL_MAP = {
         solver="lbfgs",
     ),
     MlTarget.MMSE: partial(Ridge),
+    # # Lasso
+    # MlTarget.AGE: partial(Lasso),
+    # MlTarget.COG_DECLINE: partial(
+    #     LogisticRegression,
+    #     penalty="l1",
+    #     max_iter=1000,
+    #     class_weight="balanced",
+    #     warm_start=True,
+    #     solver="liblinear",
+    # ),
+    # MlTarget.DIAGNOSIS: partial(
+    #     LogisticRegression,
+    #     penalty="l1",
+    #     max_iter=1000,
+    #     class_weight="balanced",
+    #     warm_start=True,
+    #     solver="liblinear",
+    # ),
+    # MlTarget.MMSE: partial(Lasso),
+    # # SGD
     # MlTarget.AGE: partial(SGDRegressor, warm_start=True),
     # MlTarget.COG_DECLINE: partial(
     #     SGDClassifier, class_weight="balanced", warm_start=True
@@ -188,12 +215,25 @@ class SklearnWorkflow:
 
             Xy_test_all[col_dataset] = (X_test, y_test)
 
-        Xy_test_all["-".join(sorted(Xy_test_all.keys()))] = (
+        # for combined case
+        sample_weight = pd.concat(
+            [
+                pd.Series([1 / len(Xy_test_all) / X.shape[0]] * X.shape[0])
+                for X, _ in Xy_test_all.values()
+            ],
+            axis="index",
+            ignore_index=True,
+        )
+
+        all_datasets_str = "-".join(sorted(Xy_test_all.keys()))
+        Xy_test_all[all_datasets_str] = (
             pd.concat([X for X, _ in Xy_test_all.values()], axis="index"),
             pd.concat([y for _, y in Xy_test_all.values()], axis="index"),
         )
 
-        return Xy_test_all, n_features, n_targets
+        Xy_test_all[f"{all_datasets_str}-weighted"] = Xy_test_all[all_datasets_str]
+
+        return Xy_test_all, n_features, n_targets, sample_weight
 
     def get_model(self):
         # return MODEL_MAP[self.target](random_state=self.random_state)
@@ -210,7 +250,7 @@ class SklearnWorkflow:
         train_dataset: str,
         dataset: Optional[str] = None,
     ) -> Generator[dict, None, None]:
-        Xy_test_all, n_features, n_targets = self.get_test_data(
+        Xy_test_all, n_features, n_targets, sample_weight = self.get_test_data(
             i_split=i_split, setup=setup
         )
 
@@ -275,7 +315,13 @@ class SklearnWorkflow:
                     "metric": metric_name,
                     "i_split": i_split,
                     "i_iter": i_iter,
-                    "score": metric_func(y_test, y_pred),
+                    "score": metric_func(
+                        y_test,
+                        y_pred,
+                        sample_weight=(
+                            sample_weight if "weighted" in test_dataset else None
+                        ),
+                    ),
                 }
 
     def get_results_all_setups(
@@ -322,9 +368,9 @@ class SklearnWorkflow:
 
         # save settings
         self.dpath_run_results.mkdir(parents=True, exist_ok=True)
-        if fpath_settings.exists() and not self.overwrite:
+        if fpath_metrics.exists() and not self.overwrite:
             raise KnownError(
-                f"Settings file already exists: {fpath_settings}. "
+                f"Metrics file already exists: {fpath_metrics}. "
                 "Use --overwrite to overwrite."
             )
         fpath_settings.write_text(json.dumps(self.settings, indent=4))

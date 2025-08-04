@@ -22,6 +22,6 @@ def get_metrics_map(problem: MlProblem):
             "mean_squared_error": mean_squared_error,
             "mean_absolute_error": mean_absolute_error,
             "explained_variance": explained_variance_score,
-            "corr": (lambda x, y: pearsonr(np.squeeze(x), np.squeeze(y))[0]),
+            # "corr": (lambda x, y: pearsonr(np.squeeze(x), np.squeeze(y))[0]),  # doesn't work with sample weight
         }
     raise ValueError(f"No metrics found for {problem=}")

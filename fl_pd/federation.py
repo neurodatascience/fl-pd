@@ -1,14 +1,20 @@
 from typing import Any
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression, Ridge, SGDRegressor, SGDClassifier
+from sklearn.linear_model import (
+    Lasso,
+    LogisticRegression,
+    Ridge,
+    SGDRegressor,
+    SGDClassifier,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 
 def get_initial_params(model, n_features, n_targets, classes=None) -> dict[str, Any]:
 
-    if isinstance(model, (Ridge, SGDRegressor)):
+    if isinstance(model, (Lasso, Ridge, SGDRegressor)):
         # shape (n_features,) or (n_targets, n_features)
         return {
             "coef_": np.zeros(
@@ -60,7 +66,9 @@ def get_fitted_params(model) -> dict[str, Any]:
             )
         return params
     else:
-        if isinstance(model, (LogisticRegression, Ridge, SGDClassifier, SGDRegressor)):
+        if isinstance(
+            model, (Lasso, LogisticRegression, Ridge, SGDClassifier, SGDRegressor)
+        ):
             param_names = ["coef_", "intercept_"]
         elif isinstance(model, StandardScaler):
             param_names = ["mean_", "scale_"]
