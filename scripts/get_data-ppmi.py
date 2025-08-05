@@ -8,6 +8,7 @@ import pandas as pd
 
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs6_to_fs7, fs7_aparc_to_keep, fs7_aseg_to_keep
+from fl_pd.pheno import cog_decline_from_moca_rate
 
 VISIT_IDS_ORDERED = ["SC", "BL", "V04", "V06", "V08", "V10"]
 
@@ -46,7 +47,7 @@ def get_df_pheno(fpath_pheno) -> pd.DataFrame:
     )
 
     # convert to datetime
-    for col in ["DATE_OF_BIRTH", "DATE_OF_DIAGNOSIS"]:
+    for col in ["DATE_OF_BIRTH", "DATE_OF_DIAGNOSIS", "DATE_MOCA"]:
         df_pheno[col] = pd.to_datetime(df_pheno[col], format="%m/%Y", errors="coerce")
 
     # convert to categorical
@@ -54,49 +55,41 @@ def get_df_pheno(fpath_pheno) -> pd.DataFrame:
         df_pheno[col] = df_pheno[col].astype("category")
 
     # determine cognitive decline
-    # criterion: drop of >4 from first visit to any of the follow-ups
-    data_for_df_moca_diff = []
+    data_for_df_moca_rate = []
     for participant_id in df_pheno.index.get_level_values("participant_id").unique():
         df_participant = df_pheno.loc[participant_id]
-        moca_values = df_participant["MOCA"].dropna()
-        if len(moca_values) < 2:
+        moca_values_and_dates = df_participant[["MOCA", "DATE_MOCA"]].dropna(how="any")
+
+        moca_values = moca_values_and_dates["MOCA"]
+        moca_dates_years = (
+            moca_values_and_dates["DATE_MOCA"]
+            - moca_values_and_dates["DATE_MOCA"].min()
+        ).dt.days / 365.25
+
+        # skip if only single timepoint for MoCA
+        if len(moca_dates_years) < 2 or moca_dates_years.max() < 0.5:
             continue
 
-        moca_diffs = moca_values.iloc[1:] - moca_values.iloc[0]
+        moca_rate = np.polyfit(moca_dates_years, moca_values, 1)[0]
 
-        data_for_df_moca_diff.append(
+        data_for_df_moca_rate.append(
             {
                 "participant_id": participant_id,
-                "MOCA_DIFF": moca_diffs.min(),
+                "MOCA_RATE": moca_rate,
             }
         )
-
-    df_moca_diff = pd.DataFrame(data_for_df_moca_diff)
+    df_moca_rate = pd.DataFrame(data_for_df_moca_rate)
     df_pheno = (
         df_pheno.reset_index("visit_id")
         .merge(
-            df_moca_diff.set_index("participant_id"),
+            df_moca_rate.set_index("participant_id"),
             left_index=True,
             right_index=True,
             how="left",
         )
         .set_index("visit_id", append=True)
     )
-    df_pheno["COG_DECLINE"] = df_pheno["MOCA_DIFF"].apply(
-        lambda x: x <= -3 if not np.isnan(x) else np.nan
-    )
-
-    # fill in missing BL values with SC (if available) for the MOCA
-    for idx, row in df_pheno.query('visit_id == "BL"').iterrows():
-        col = "MOCA"
-        if pd.isna(row[col]):
-            try:
-                sc_row = df_pheno.loc[(idx[0], "SC")]
-            except KeyError:
-                continue
-
-            sc_val = sc_row[col].item()
-            df_pheno.loc[idx, col] = sc_val
+    df_pheno["COG_DECLINE"] = df_pheno["MOCA_RATE"].apply(cog_decline_from_moca_rate)
 
     # keep only BL
     df_pheno = df_pheno.query('visit_id == "BL"').reset_index("visit_id", drop=True)

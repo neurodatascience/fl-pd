@@ -8,6 +8,7 @@ import pandas as pd
 
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs6_to_fs7, fs7_aparc_to_keep, fs7_aseg_to_keep
+from fl_pd.pheno import cog_decline_from_mmse_rate
 
 
 def get_df_pheno(fpath_pheno):
@@ -37,52 +38,54 @@ def get_df_pheno(fpath_pheno):
         .astype("category")
     )
 
-    visits = [
-        "bl",
-        "m0",
-        "m03",
-        "m06",
-        "m12",
-        "m18",
-        "m24",
-        "m30",
-        "m36",
-        "m42",
-        "m48",
-        "m54",
-        "m60",
-    ]
-    df_pheno_5_years = df_pheno.query("VISCODE in @visits")
-    data_for_df_mmse_diff = []
+    # visits = [
+    #     "bl",
+    #     "m0",
+    #     "m03",
+    #     "m06",
+    #     "m12",
+    #     "m18",
+    #     "m24",
+    #     "m30",
+    #     "m36",
+    #     "m42",
+    #     "m48",
+    #     "m54",
+    #     "m60",
+    # ]
+    df_pheno_5_years = df_pheno  # .query("VISCODE in @visits")
+    data_for_df_mmse_rate = []
     for participant_id in df_pheno_5_years.index.get_level_values(
         "participant_id"
     ).unique():
         df_participant = df_pheno_5_years.loc[[participant_id]]
 
-        mmse_values = df_participant["MMSE"].dropna()
-        if len(mmse_values) < 2:
+        mmse_values_and_years = df_participant[["MMSE", "Years_bl"]].dropna(how="any")
+
+        mmse_values = mmse_values_and_years["MMSE"]
+        mmse_years = mmse_values_and_years["Years_bl"]
+
+        # skip if only single timepoint for MMSE
+        if len(mmse_years) < 2 or mmse_years.max() < 0.5:
             continue
 
-        mmse_diffs = mmse_values.iloc[1:] - mmse_values.iloc[0]
+        mmse_rate = np.polyfit(mmse_years, mmse_values, 1)[0]
 
-        data_for_df_mmse_diff.append(
+        data_for_df_mmse_rate.append(
             {
                 "participant_id": participant_id,
-                "MMSE_DIFF": mmse_diffs.min(),
-                "n_mmse": len(mmse_values),
+                "MMSE_RATE": mmse_rate,
             }
         )
 
-    df_mmse_diff = pd.DataFrame(data_for_df_mmse_diff)
+    df_mmse_rate = pd.DataFrame(data_for_df_mmse_rate)
     df_pheno = df_pheno.merge(
-        df_mmse_diff.set_index("participant_id"),
+        df_mmse_rate.set_index("participant_id"),
         left_index=True,
         right_index=True,
         how="left",
     )
-    df_pheno["COG_DECLINE"] = df_pheno["MMSE_DIFF"].apply(
-        lambda x: x <= -3 if not np.isnan(x) else np.nan
-    )
+    df_pheno["COG_DECLINE"] = df_pheno["MMSE_RATE"].apply(cog_decline_from_mmse_rate)
 
     df_pheno = df_pheno.query('VISCODE == "bl"')
 

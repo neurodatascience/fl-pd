@@ -8,6 +8,7 @@ import pandas as pd
 
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs7_aparc_to_keep, fs7_aseg_to_keep
+from fl_pd.pheno import cog_decline_from_moca_rate
 
 VISIT_IDS_ORDERED = [
     "legacy-moca",
@@ -74,19 +75,29 @@ def get_df_pheno(fpath_demographics, fpath_age, fpath_diagnosis, fpath_moca):
         key=lambda x: x.map(VISIT_IDS_ORDERED.index),
     )
 
-    df_moca_diff = pd.DataFrame(index=df_pheno.index)
+    df_moca_rate = pd.DataFrame(index=df_pheno.index)
     for participant_id in df_moca.index.unique():
         df_moca_participant = df_moca.loc[participant_id]
         if not isinstance(df_moca_participant, pd.Series):
-            moca_scores = df_moca_participant["MOCA"].dropna()
-            moca_diff = moca_scores.iloc[1:] - moca_scores.iloc[0]
+            moca_scores_and_ages = df_moca_participant[["MOCA", "moca_age"]].dropna(
+                how="any"
+            )
+            moca_scores = moca_scores_and_ages["MOCA"]
+            moca_years = (
+                moca_scores_and_ages["moca_age"]
+                - moca_scores_and_ages["moca_age"].min()
+            )
 
-            df_moca_diff.loc[participant_id, "MOCA_DIFF"] = moca_diff.min()
+            # skip if only single timepoint for MoCA
+            if len(moca_years) < 2 or moca_years.max() < 0.5:
+                continue
 
-    df_pheno = df_pheno.merge(df_moca_diff, left_index=True, right_index=True)
-    df_pheno["COG_DECLINE"] = df_pheno["MOCA_DIFF"].apply(
-        lambda x: x <= -3 if not np.isnan(x) else np.nan
-    )
+            moca_rate = np.polyfit(moca_years, moca_scores, 1)[0]
+
+            df_moca_rate.loc[participant_id, "MOCA_RATE"] = moca_rate
+
+    df_pheno = df_pheno.merge(df_moca_rate, left_index=True, right_index=True)
+    df_pheno["COG_DECLINE"] = df_pheno["MOCA_RATE"].apply(cog_decline_from_moca_rate)
 
     df_pheno = df_pheno[COLS_PHENO]
     print(f"Using {df_pheno.shape[1]} phenotypic features")

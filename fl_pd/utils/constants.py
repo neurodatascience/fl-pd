@@ -6,6 +6,10 @@ DATASETS = ("adni", "ppmi", "qpn", "site1", "site2", "site3")  # sorted
 
 COLS_PHENO = ["COG_DECLINE", "AGE", "SEX", "DIAGNOSIS", "IS_CONTROL"]
 
+# cognitive decline thresholds
+THRESHOLD_MOCA_RATE = -1
+THRESHOLD_MMSE_RATE = -1
+
 PCN_MODEL_INFO_A2009S_ASEG = ("lifespan_57K_82sites", "site_ids_ct_82sites.txt")
 PCN_MODEL_INFO_DK = ("lifespan_DK_46K_59sites", "site_ids_ct_dk_59sites.txt")
 
