@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import datetime
 import json
 import sys
 import warnings
@@ -29,7 +28,7 @@ from fl_pd.federation import (
     get_initial_params,
     set_params,
 )
-from fl_pd.io import load_Xy
+from fl_pd.io import get_dpath_latest, load_Xy
 from fl_pd.metrics import get_metrics_map
 from fl_pd.utils.constants import (
     CLICK_CONTEXT_SETTINGS,
@@ -144,14 +143,12 @@ class SklearnWorkflow:
             "dpath_results",
             "model",
         ):
-            self.settings[key] = str(self.settings[key])
+            value = self.settings[key]
+            if isinstance(value, Path):
+                value = value.resolve()
+            self.settings[key] = str(value)
 
-        dpath_run_results = (
-            self.dpath_results
-            / datetime.datetime.now().strftime("%Y_%m_%d")
-            / f"{self.data_tags}-{self.random_state}"
-        )
-        self.dpath_run_results = dpath_run_results
+        self.dpath_run_results = None  # to be set in run()
 
     def get_train_data(
         self,
@@ -358,6 +355,10 @@ class SklearnWorkflow:
 
     def run(self):
         # results paths
+        self.dpath_run_results = (
+            get_dpath_latest(self.dpath_results, use_today=True)
+            / f"{self.data_tags}-{self.random_state}"
+        )
         fname_base_metrics = f"metrics-{self.n_splits}_splits-{self.n_iter_null}_null"
         fname_base_settings = f"settings-{self.n_splits}_splits-{self.n_iter_null}_null"
         if self.sloppy:
@@ -373,6 +374,7 @@ class SklearnWorkflow:
                 f"Metrics file already exists: {fpath_metrics}. "
                 "Use --overwrite to overwrite."
             )
+        self.settings["dpath_run_results"] = str(self.dpath_run_results)
         fpath_settings.write_text(json.dumps(self.settings, indent=4))
 
         # normal models

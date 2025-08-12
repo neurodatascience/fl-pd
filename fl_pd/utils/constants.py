@@ -13,6 +13,10 @@ THRESHOLD_MMSE_RATE = -1
 PCN_MODEL_INFO_A2009S_ASEG = ("lifespan_57K_82sites", "site_ids_ct_82sites.txt")
 PCN_MODEL_INFO_DK = ("lifespan_DK_46K_59sites", "site_ids_ct_dk_59sites.txt")
 
+# directory naming conventions
+DNAME_LATEST = "latest"
+DATE_FORMAT = "%Y-%m-%d"
+
 
 class MlSetup(str, enum.Enum):
     SILO = "silo"

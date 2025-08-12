@@ -6,6 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 
+from fl_pd.io import get_dpath_latest
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, COLS_PHENO
 from fl_pd.utils.freesurfer import fs6_to_fs7, fs7_aparc_to_keep, fs7_aseg_to_keep
 from fl_pd.pheno import cog_decline_from_moca_rate
@@ -193,7 +194,7 @@ def get_data_ppmi(
         fpath_aparc = fpath_aparc_fs6
         fname_data_out_components.append("fs6")
 
-    dpath_out.mkdir(exist_ok=True)
+    dpath_out = get_dpath_latest(dpath_out)
     tags = "-".join(fname_data_out_components)
     fpath_data_out = (dpath_out / tags / tags).with_suffix(".tsv")
 

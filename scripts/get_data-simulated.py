@@ -7,6 +7,8 @@ import click
 import numpy as np
 import pandas as pd
 
+from fl_pd.io import get_dpath_latest
+
 DEFAULT_N_SITES = 3
 DEFAULT_DNAME = "_fedbiomed_simulated"
 DEFAULT_FNAMES = [
@@ -44,6 +46,7 @@ def get_data_simulated(
 
     dfs_sites: list[pd.DataFrame] = np.array_split(df_all, n_sites)
 
+    dpath_data = get_dpath_latest(dpath_data)
     for i_site, df_site in enumerate(dfs_sites, 1):
         print(f"Site {i_site}: {df_site.shape}")
         tag = f"site{i_site}-simulated"

@@ -1,8 +1,30 @@
+import datetime
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from skrub import TableVectorizer
 
-from fl_pd.utils.constants import MlSetup
+from fl_pd.utils.constants import MlSetup, DNAME_LATEST, DATE_FORMAT
+
+
+def get_dpath_latest(dpath_parent, use_today=False):
+    dpath_parent = Path(dpath_parent)
+    dpath_latest = dpath_parent / DNAME_LATEST
+
+    dpath_today = dpath_parent / datetime.datetime.today().strftime(DATE_FORMAT)
+    if dpath_latest.exists():
+        if use_today and dpath_latest.resolve() != dpath_today.resolve():
+            if dpath_latest.is_symlink():
+                dpath_latest.unlink()
+            else:
+                raise RuntimeError(f"{dpath_latest=} exists but is not a symlink")
+
+    if not dpath_latest.exists():
+        dpath_today.mkdir(parents=True, exist_ok=True)
+        dpath_latest.symlink_to(dpath_today, target_is_directory=True)
+
+    return dpath_latest.resolve()
 
 
 def load_Xy(

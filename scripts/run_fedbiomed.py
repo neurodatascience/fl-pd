@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import datetime
 import json
 import sys
 from copy import deepcopy
@@ -16,7 +15,7 @@ from yaml import load, Loader
 from fedbiomed.researcher.federated_workflows import Experiment
 from fedbiomed.researcher.aggregators.fedavg import FedAverage
 
-from fl_pd.io import load_Xy
+from fl_pd.io import get_dpath_latest, load_Xy
 from fl_pd.metrics import get_metrics_map
 from fl_pd.utils.constants import (
     CLICK_CONTEXT_SETTINGS,
@@ -89,8 +88,16 @@ class FedbiomedWorkflow:
 
         self.settings = deepcopy(locals())
         self.settings.pop("self")
-        for key in ("dpath_data", "dpath_results", "dpath_researcher", "fpath_config"):
-            self.settings[key] = str(self.settings[key])
+        for key in (
+            "dpath_data",
+            "dpath_results",
+            "dpath_researcher",
+            "fpath_config",
+        ):
+            value = self.settings[key]
+            if isinstance(value, Path):
+                value = value.resolve()
+            self.settings[key] = str(value)
         self.settings["model_args"] = self.get_model_args(None, None)
 
         framework_tags = f"{self.framework.value}-{self.problem.value}"
@@ -99,12 +106,9 @@ class FedbiomedWorkflow:
                 framework_tags += f"-{self.sgdc_loss}"
             elif self.problem == MlProblem.REGRESSION:
                 framework_tags += f"-{self.sgdr_loss}"
-        dpath_run_results = (
-            self.dpath_results
-            / datetime.datetime.now().strftime("%Y_%m_%d")
-            / f"{framework_tags}-{self.data_tags}-{self.random_state}"
-        )
-        self.dpath_run_results = dpath_run_results
+        self.framework_tags = framework_tags
+
+        self.dpath_run_results = None  # to be set in run()
 
     def get_test_data(self, i_split: int, setup: MlSetup):
         Xy_test_all = {}
@@ -141,7 +145,7 @@ class FedbiomedWorkflow:
     def get_model_args(self, n_features, n_targets, null=False):
         model_args = {
             "eta0": 0.05,  # NativeSklearnOptimizer
-            # "learning_rate": 0.01,  # NativeSklearnOptimizer
+            "learning_rate": "invscaling",  # NativeSklearnOptimizer
             "random_state": self.random_state,
             "n_features": n_features,
             "n_targets": n_targets,
@@ -277,6 +281,10 @@ class FedbiomedWorkflow:
 
     def run(self):
         # results paths
+        self.dpath_run_results = (
+            get_dpath_latest(self.dpath_results, use_today=True)
+            / f"{self.framework_tags}-{self.data_tags}-{self.random_state}"
+        )
         fname_base_metrics = f"metrics-{self.n_splits}_splits-{self.n_iter_null}_null"
         fname_base_settings = f"settings-{self.n_splits}_splits-{self.n_iter_null}_null"
         if self.sloppy:
@@ -292,6 +300,7 @@ class FedbiomedWorkflow:
                 f"Settings file already exists: {fpath_settings}. "
                 "Use --overwrite to overwrite."
             )
+        self.settings["dpath_run_results"] = str(self.dpath_run_results)
         fpath_settings.write_text(json.dumps(self.settings, indent=4))
 
         # normal models
