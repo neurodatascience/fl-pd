@@ -6,11 +6,11 @@ import click
 import pandas as pd
 
 from fl_pd.io import get_dpath_latest
-from fl_pd.pheno import cog_decline_from_preventad_mci
+from fl_pd.pheno import cog_decline_from_pad_mci
 from fl_pd.utils.constants import (
     CLICK_CONTEXT_SETTINGS,
     COLS_PHENO,
-    DPATH_RELATIVE_PREVENTAD_IMAGING_SESSIONS,
+    DPATH_RELATIVE_PAD_IMAGING_SESSIONS,
 )
 from fl_pd.utils.freesurfer import fs7_aparc_to_keep, fs7_aseg_to_keep
 
@@ -39,7 +39,7 @@ def get_df_pheno(fpath_demographics, fpath_age, fpath_mci) -> pd.DataFrame:
         dtype={"participant_id": str},
     ).set_index("participant_id")
 
-    df_cog_decline = cog_decline_from_preventad_mci(df_mci)
+    df_cog_decline = cog_decline_from_pad_mci(df_mci)
 
     df_pheno = df_age.copy()
     df_pheno = df_pheno.merge(
@@ -94,7 +94,7 @@ def get_df_imaging(fpath_aseg, fpath_aparc, fpath_imaging_sessions) -> pd.DataFr
     return df_imaging
 
 
-def get_df_preventad(
+def get_df_pad(
     fpath_demographics,
     fpath_age,
     fpath_mci,
@@ -117,34 +117,34 @@ def get_df_preventad(
 @click.argument(
     "fpath_demographics",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PREVENTAD_DEMOGRAPHICS",
+    envvar="FPATH_PAD_DEMOGRAPHICS",
 )
 @click.argument(
     "fpath_age",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PREVENTAD_AGE",
+    envvar="FPATH_PAD_AGE",
 )
 @click.argument(
     "fpath_mci",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PREVENTAD_MCI",
+    envvar="FPATH_PAD_MCI",
 )
 @click.argument(
     "fpath_aseg",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PREVENTAD_ASEG",
+    envvar="FPATH_PAD_ASEG",
 )
 @click.argument(
     "fpath_aparc",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PREVENTAD_APARC",
+    envvar="FPATH_PAD_APARC",
 )
 @click.argument(
     "dpath_out",
     type=click.Path(path_type=Path, writable=True),
     envvar="DPATH_FL_DATA",
 )
-def get_data_preventad(
+def get_data_pad(
     fpath_demographics: Path,
     fpath_age: Path,
     fpath_mci: Path,
@@ -152,15 +152,15 @@ def get_data_preventad(
     fpath_aparc: Path,
     dpath_out: Path,
 ):
-    fname_data_out_components = ["preventad"]
+    fname_data_out_components = ["pad"]
 
     dpath_out = get_dpath_latest(dpath_out)
     tags = "-".join(fname_data_out_components)
     fpath_data_out = (dpath_out / tags / tags).with_suffix(".tsv")
 
-    fpath_imaging_sessions = dpath_out / DPATH_RELATIVE_PREVENTAD_IMAGING_SESSIONS
+    fpath_imaging_sessions = dpath_out / DPATH_RELATIVE_PAD_IMAGING_SESSIONS
 
-    df_ppmi = get_df_preventad(
+    df_ppmi = get_df_pad(
         fpath_demographics=fpath_demographics,
         fpath_age=fpath_age,
         fpath_mci=fpath_mci,
@@ -177,4 +177,4 @@ def get_data_preventad(
 
 
 if __name__ == "__main__":
-    get_data_preventad()
+    get_data_pad()

@@ -40,7 +40,7 @@ from fl_pd.ml_spec import ML_TARGET_TO_PROBLEM_MAP, get_target_from_tag
 
 DEFAULT_N_ROUNDS = 1
 DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
-DEFAULT_DATASETS = ("adni", "ppmi", "preventad", "qpn")
+DEFAULT_DATASETS = ("adni", "pad", "ppmi", "qpn")
 DEFAULT_N_SPLITS = 1
 DEFAULT_N_ITER_NULL = 1
 
