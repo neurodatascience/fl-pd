@@ -44,30 +44,26 @@ def get_df_pheno(fpath_demographics, fpath_age, fpath_diagnosis, fpath_moca):
     )
 
     # recode sex
-    df_pheno["SEX"] = (
-        df_pheno["SEX"]
-        .map({"Male/Masculin": 1, "Female/Féminin": 0})
-        .astype("category")
-    )
+    df_pheno["SEX"] = df_pheno["SEX"].map({"Male/Masculin": 1, "Female/Féminin": 0})
 
     # recode diagnosis
-    df_pheno["DIAGNOSIS"] = (
-        df_pheno["diagnosis_group_for_analysis"]
-        .map({"control": 0, "PD": 1})
-        .astype("category")
+    df_pheno["DIAGNOSIS"] = df_pheno["diagnosis_group_for_analysis"].map(
+        {"control": 0, "PD": 1}
     )
 
     # mark healthy controls
-    df_pheno["IS_CONTROL"] = (
-        df_pheno["diagnosis_group_for_analysis"]
-        .map({"control": True, "PD": False})
-        .astype("category")
+    df_pheno["IS_CONTROL"] = df_pheno["diagnosis_group_for_analysis"].map(
+        {"control": True, "PD": False}
     )
 
-    # education
-    # probably not best to have this as category
-    # but the edge values are 6- and 20+ so this is not entirely numeric
-    df_pheno["EDUCATION"] = df_pheno["EDUCATION"].astype("category")
+    df_pheno["IS_CASE"] = df_pheno["IS_CONTROL"].apply(
+        lambda x: not x if pd.notna(x) else x
+    )
+
+    for col in ["SEX", "DIAGNOSIS", "IS_CONTROL", "IS_CASE", "EDUCATION"]:
+        # probably not best to have education as category
+        # but the edge values are 6- and 20+ so this is not entirely numeric
+        df_pheno[col] = df_pheno[col].astype("category")
 
     df_moca = pd.read_csv(fpath_moca).set_index("participant_id").sort_index()
     df_moca = df_moca.rename(columns={"MoCA Total Score": "MOCA"})
@@ -166,12 +162,12 @@ def get_df_qpn(
 @click.argument(
     "fpath_aseg",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PPMI_ASEG",
+    envvar="FPATH_QPN_ASEG",
 )
 @click.argument(
     "fpath_aparc",
     type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_PPMI_APARC",
+    envvar="FPATH_QPN_APARC",
 )
 @click.argument(
     "dpath_out",

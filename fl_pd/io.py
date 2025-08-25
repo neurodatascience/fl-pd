@@ -21,6 +21,8 @@ def get_dpath_latest(dpath_parent, use_today=False):
                 raise RuntimeError(f"{dpath_latest=} exists but is not a symlink")
 
     if not dpath_latest.exists():
+        if dpath_latest.is_symlink():
+            dpath_latest.unlink()
         dpath_today.mkdir(parents=True, exist_ok=True)
         dpath_latest.symlink_to(dpath_today, target_is_directory=True)
 

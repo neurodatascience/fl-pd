@@ -39,12 +39,11 @@ def get_df_pheno(fpath_pheno) -> pd.DataFrame:
     )
 
     # PD patients + prodromal are not control
-    df_pheno["IS_CONTROL"] = (
-        df_pheno["COHORT_DEFINITION"]
-        .map(
-            {"Healthy Control": True, "Parkinson's Disease": False, "Prodromal": False}
-        )
-        .astype("category")
+    df_pheno["IS_CONTROL"] = df_pheno["COHORT_DEFINITION"].map(
+        {"Healthy Control": True, "Parkinson's Disease": False, "Prodromal": False}
+    )
+    df_pheno["IS_CASE"] = df_pheno["IS_CONTROL"].apply(
+        lambda x: not x if pd.notna(x) else x
     )
 
     # convert to datetime
@@ -52,7 +51,13 @@ def get_df_pheno(fpath_pheno) -> pd.DataFrame:
         df_pheno[col] = pd.to_datetime(df_pheno[col], format="%m/%Y", errors="coerce")
 
     # convert to categorical
-    for col in ["SEX", "COHORT_DEFINITION", "PRIMARY_DIAGNOSIS"]:
+    for col in [
+        "SEX",
+        "COHORT_DEFINITION",
+        "PRIMARY_DIAGNOSIS",
+        "IS_CONTROL",
+        "IS_CASE",
+    ]:
         df_pheno[col] = df_pheno[col].astype("category")
 
     # determine cognitive decline

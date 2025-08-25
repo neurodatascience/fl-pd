@@ -107,9 +107,10 @@ def subset_data(
             dfs_to_concatenate.append(df_full.query("IS_CONTROL == True"))
             print(f"Keeping {len(dfs_to_concatenate[-1])} controls")
         if include_cases:
-            dfs_to_concatenate.append(df_full.query("IS_CONTROL == False"))
+            dfs_to_concatenate.append(df_full.query("IS_CASE == True"))
             print(f"Keeping {len(dfs_to_concatenate[-1])} cases")
         df_subset = pd.concat(dfs_to_concatenate, axis="index")
+        df_subset = df_subset.drop_duplicates()
 
         print(f"Keeping {len(cols)} columns")
         df_subset = df_subset.loc[:, cols]

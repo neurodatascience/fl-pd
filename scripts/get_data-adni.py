@@ -22,22 +22,21 @@ def get_df_pheno(fpath_pheno):
     df_pheno = df_pheno.sort_values(by="EXAMDATE", ascending=True)
 
     # use PPMI coding for sex
-    df_pheno["SEX"] = (
-        df_pheno["PTGENDER"].map({"Male": 1, "Female": 0}).astype("category")
-    )
+    df_pheno["SEX"] = df_pheno["PTGENDER"].map({"Male": 1, "Female": 0})
 
     # recode diagnosis
-    df_pheno["DIAGNOSIS"] = (
-        df_pheno["DX_bl"]
-        .map(lambda x: 0 if x == "CN" else (1 if not pd.isna(x) else pd.NA))
-        .astype("category")
+    df_pheno["DIAGNOSIS"] = df_pheno["DX_bl"].map(
+        lambda x: 0 if x == "CN" else (1 if not pd.isna(x) else pd.NA)
     )
 
-    df_pheno["IS_CONTROL"] = (
-        df_pheno["DX_bl"]
-        .map(lambda x: True if x == "CN" else (False if not pd.isna(x) else pd.NA))
-        .astype("category")
+    df_pheno["IS_CONTROL"] = df_pheno["DX_bl"].map(
+        lambda x: True if x == "CN" else (False if not pd.isna(x) else pd.NA)
     )
+    df_pheno["IS_CASE"] = df_pheno["IS_CONTROL"].apply(
+        lambda x: not x if pd.notna(x) else x
+    )
+    for col in ("IS_CONTROL", "IS_CASE", "DIAGNOSIS", "SEX"):
+        df_pheno[col] = df_pheno[col].astype("category")
 
     # visits = [
     #     "bl",
