@@ -2,7 +2,16 @@ import enum
 
 CLICK_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"], "show_default": True}
 
-DATASETS = ("adni", "pad", "ppmi", "qpn", "site1", "site2", "site3")  # sorted
+DATASETS = (
+    "adni",
+    "calgary",
+    "pad",
+    "ppmi",
+    "qpn",
+    "site1",
+    "site2",
+    "site3",
+)  # sorted
 
 COLS_PHENO = ["COG_DECLINE", "AGE", "SEX", "DIAGNOSIS", "IS_CONTROL", "IS_CASE"]
 
@@ -15,7 +24,7 @@ PCN_MODEL_INFO_DK = ("lifespan_DK_46K_59sites", "site_ids_ct_dk_59sites.txt")
 
 # directory naming conventions
 DNAME_LATEST = "latest"
-DATE_FORMAT = "%Y-%m-%d"
+DATE_FORMAT = "%Y_%m_%d"
 
 # script-generated files
 DPATH_RELATIVE_PAD_IMAGING_SESSIONS = "pad/imaging_sessions.csv"
