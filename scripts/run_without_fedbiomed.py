@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 
-import json
 import sys
 import warnings
-from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import Generator, Iterable, Optional
 
 import click
 import numpy as np
-import pandas as pd
 from sklearn.base import clone
 from sklearn.linear_model import (
     LogisticRegression,
@@ -22,27 +18,29 @@ from sklearn.linear_model import (
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from fl_pd.base_workflow import (
+    BaseWorkflow,
+    KnownError,
+    DEFAULT_N_ITER_NULL,
+    DEFAULT_DATASETS,
+    DEFAULT_SETUPS,
+)
 from fl_pd.federation import (
     average_params,
     get_fitted_params,
     get_initial_params,
     set_params,
 )
-from fl_pd.io import get_dpath_latest, load_Xy
-from fl_pd.metrics import get_metrics_map
+from fl_pd.io import load_Xy
 from fl_pd.utils.constants import (
     CLICK_CONTEXT_SETTINGS,
+    MlFramework,
     MlProblem,
     MlSetup,
     MlTarget,
 )
-from fl_pd.ml_spec import ML_TARGET_TO_PROBLEM_MAP, get_target_from_tag
 
 DEFAULT_N_ROUNDS = 1
-DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
-DEFAULT_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")
-DEFAULT_N_SPLITS = 1
-DEFAULT_N_ITER_NULL = 1
 
 MODEL_MAP = {
     # Ridge
@@ -95,73 +93,33 @@ MODEL_MAP = {
 warnings.filterwarnings(action="ignore", message="X has feature names")
 
 
-class KnownError(Exception):
-    pass
-
-
-class SklearnWorkflow:
-    def __init__(
-        self,
-        dpath_data: Path,
-        dpath_results: Path,
-        data_tags: str,
-        n_rounds: int = DEFAULT_N_ROUNDS,
-        setups: Iterable[MlSetup] = DEFAULT_SETUPS,
-        test_datasets: Iterable[str] = DEFAULT_DATASETS,
-        n_splits: int = DEFAULT_N_SPLITS,
-        n_iter_null: int = DEFAULT_N_ITER_NULL,
-        random_state: Optional[int] = None,
-        sloppy: bool = False,
-        overwrite: bool = False,
-    ):
-        self.dpath_data = Path(dpath_data)
-        self.dpath_results = Path(dpath_results)
-        self.data_tags = data_tags
+class SklearnWorkflow(BaseWorkflow):
+    def __init__(self, *args, n_rounds: int = DEFAULT_N_ROUNDS, **kwargs):
+        super().__init__(*args, framework=MlFramework.SKLEARN, **kwargs)
         self.n_rounds = n_rounds
-        self.setups = setups
-        self.test_datasets = test_datasets
-        self.n_splits = n_splits
-        self.n_iter_null = n_iter_null
-        self.random_state = random_state
-        self.sloppy = sloppy
-        self.overwrite = overwrite
+        self.model = self._get_model()
 
-        self.target = get_target_from_tag(self.data_tags)
-        target_cols = [self.target.value.upper()]
-        self.target_cols = target_cols
+    def results_suffix(self) -> str:
+        return f"pure_sklearn-{super().results_suffix}"
 
-        problem = ML_TARGET_TO_PROBLEM_MAP[get_target_from_tag(self.data_tags)]
-        self.problem = problem
+    def _get_model(self):
+        model = MODEL_MAP[self.target](random_state=self.random_state)
+        if "standardized" not in self.data_tags and "norm" not in self.data_tags:
+            model = make_pipeline(StandardScaler(), model)
+        return model
 
-        model = self.get_model()
-        self.model = model
-
-        self.settings = deepcopy(locals())
-        self.settings.pop("self")
-        for key in (
-            "dpath_data",
-            "dpath_results",
-            "model",
-        ):
-            value = self.settings[key]
-            if isinstance(value, Path):
-                value = value.resolve()
-            self.settings[key] = str(value)
-
-        self.dpath_run_results = None  # to be set in run()
-
-    def get_train_data(
+    def _get_train_data(
         self,
         i_split: int,
         null: bool,
         setup: MlSetup,
-        dataset: Optional[str] = None,
+        dataset: str,
         squeeze: bool = True,
     ):
-        if dataset is not None or setup == MlSetup.SILO:
+        if setup != MlSetup.MEGA:
             dataset_str = dataset
-        elif setup == MlSetup.MEGA:
-            dataset_str = "_".join(["mega"] + list(sorted(self.test_datasets)))
+        else:
+            dataset_str = "_".join(["mega"] + list(sorted(self.datasets)))
 
         fpath = (
             self.dpath_data
@@ -171,10 +129,10 @@ class SklearnWorkflow:
 
         X, y = load_Xy(
             fpath,
-            target_cols=self.target_cols,
+            target_cols=[self.target_col],
             setup=setup,
             dataset=dataset,
-            datasets=self.test_datasets,
+            datasets=self.datasets,
             null=null,
         )
         if squeeze:
@@ -182,76 +140,15 @@ class SklearnWorkflow:
 
         return X, y
 
-    def get_test_data(self, i_split: int, setup: MlSetup):
-        Xy_test_all = {}
-        n_features = None
-        n_targets = None
-        for col_dataset in self.test_datasets:
-            fpath = (
-                self.dpath_data
-                / f"{col_dataset}-{self.data_tags}"
-                / f"{col_dataset}-{self.data_tags}-{i_split}test.tsv"
-            )
-            X_test, y_test = load_Xy(
-                fpath,
-                target_cols=self.target_cols,
-                setup=setup,
-                dataset=col_dataset,
-                datasets=self.test_datasets,
-            )
-
-            if n_features is None:
-                n_features = X_test.shape[1]
-            else:
-                assert (
-                    n_features == X_test.shape[1]
-                ), f"Inconsistent number of features ({n_features=} vs {X_test.shape[1]=}): {fpath}"
-
-            if n_targets is None:
-                n_targets = y_test.shape[1]
-            else:
-                assert n_targets == y_test.shape[1], "Inconsistent number of targets"
-
-            Xy_test_all[col_dataset] = (X_test, y_test)
-
-        # for combined case
-        sample_weight = pd.concat(
-            [
-                pd.Series([1 / len(Xy_test_all) / X.shape[0]] * X.shape[0])
-                for X, _ in Xy_test_all.values()
-            ],
-            axis="index",
-            ignore_index=True,
-        )
-
-        all_datasets_str = "-".join(sorted(Xy_test_all.keys()))
-        Xy_test_all[all_datasets_str] = (
-            pd.concat([X for X, _ in Xy_test_all.values()], axis="index"),
-            pd.concat([y for _, y in Xy_test_all.values()], axis="index"),
-        )
-
-        Xy_test_all[f"{all_datasets_str}-weighted"] = Xy_test_all[all_datasets_str]
-
-        return Xy_test_all, n_features, n_targets, sample_weight
-
-    def get_model(self):
-        # return MODEL_MAP[self.target](random_state=self.random_state)
-        return make_pipeline(
-            StandardScaler(), MODEL_MAP[self.target](random_state=self.random_state)
-        )
-
-    def get_results(
+    def train(
         self,
-        i_split: int,
-        i_iter: int,
-        null: bool,
         setup: MlSetup,
+        n_features: int,
+        n_targets: int,
+        i_split: int,
+        null: bool,
         train_dataset: str,
-        dataset: Optional[str] = None,
-    ) -> Generator[dict, None, None]:
-        Xy_test_all, n_features, n_targets, sample_weight = self.get_test_data(
-            i_split=i_split, setup=setup
-        )
+    ):
 
         if setup == MlSetup.FEDERATED:
 
@@ -266,8 +163,8 @@ class SklearnWorkflow:
             for _ in range(self.n_rounds):
                 fitted_params = []
                 n_samples = []
-                for dataset in self.test_datasets:
-                    X_train, y_train = self.get_train_data(
+                for dataset in self.datasets:
+                    X_train, y_train = self._get_train_data(
                         i_split=i_split, null=null, setup=setup, dataset=dataset
                     )
 
@@ -289,114 +186,14 @@ class SklearnWorkflow:
             set_params(model, params)
 
         else:
-            X_train, y_train = self.get_train_data(
-                i_split=i_split, null=null, setup=setup, dataset=dataset
+            X_train, y_train = self._get_train_data(
+                i_split=i_split, null=null, setup=setup, dataset=train_dataset
             )
 
             model = clone(self.model)
             model.fit(X_train, y_train)
 
-        # evaluate
-        metrics_map = get_metrics_map(self.problem)
-        for test_dataset in Xy_test_all.keys():
-            X_test, y_test = Xy_test_all[test_dataset]
-
-            y_pred = model.predict(X_test)
-
-            for metric_name, metric_func in metrics_map.items():
-                yield {
-                    "setup": setup.value,
-                    "problem": self.problem.value,
-                    "target": self.target.value,
-                    "train_dataset": train_dataset,
-                    "test_dataset": test_dataset,
-                    "is_null": null,
-                    "metric": metric_name,
-                    "i_split": i_split,
-                    "i_iter": i_iter,
-                    "score": metric_func(
-                        y_test,
-                        y_pred,
-                        sample_weight=(
-                            sample_weight if "weighted" in test_dataset else None
-                        ),
-                    ),
-                }
-
-    def get_results_all_setups(
-        self, n_iter: int, null: bool = False
-    ) -> Generator[dict, None, None]:
-        for setup in self.setups:
-            for i_split in range(self.n_splits):
-                for i_iter in range(n_iter):
-                    print(
-                        f"Running:\tsetup={setup.value}\t{i_split=}\t{i_iter=}\t{null=}"
-                    )
-                    if setup == MlSetup.SILO:
-                        for dataset in self.test_datasets:
-                            yield from (
-                                self.get_results(
-                                    i_split=i_split,
-                                    i_iter=i_iter,
-                                    null=null,
-                                    setup=setup,
-                                    dataset=dataset,
-                                    train_dataset=dataset,
-                                )
-                            )
-                    else:
-                        yield from (
-                            self.get_results(
-                                i_split=i_split,
-                                i_iter=i_iter,
-                                null=null,
-                                setup=setup,
-                                train_dataset="-".join(sorted(self.test_datasets)),
-                            )
-                        )
-
-    def run(self):
-        # results paths
-        self.dpath_run_results = (
-            get_dpath_latest(self.dpath_results, use_today=True)
-            / f"{self.data_tags}-{self.random_state}"
-        )
-        fname_base_metrics = f"metrics-{self.n_splits}_splits-{self.n_iter_null}_null"
-        fname_base_settings = f"settings-{self.n_splits}_splits-{self.n_iter_null}_null"
-        if self.sloppy:
-            fname_base_metrics += "-sloppy"
-            fname_base_settings += "-sloppy"
-        fpath_metrics = self.dpath_run_results / f"{fname_base_metrics}.tsv"
-        fpath_settings = self.dpath_run_results / f"{fname_base_settings}.json"
-
-        # save settings
-        self.dpath_run_results.mkdir(parents=True, exist_ok=True)
-        if fpath_metrics.exists() and not self.overwrite:
-            raise KnownError(
-                f"Metrics file already exists: {fpath_metrics}. "
-                "Use --overwrite to overwrite."
-            )
-        self.settings["dpath_run_results"] = str(self.dpath_run_results)
-        fpath_settings.write_text(json.dumps(self.settings, indent=4))
-
-        # normal models
-        data_results = []
-        for results in self.get_results_all_setups(n_iter=1, null=False):
-            # save the results as they are being obtained
-            data_results.append(results)
-            df_results = pd.DataFrame(data_results)
-            if len(df_results) > 0:
-                df_results.to_csv(fpath_metrics, sep="\t", index=False)
-
-        # null models
-        for results in self.get_results_all_setups(n_iter=self.n_iter_null, null=True):
-            # save the results as they are being obtained
-            data_results.append(results)
-            df_results = pd.DataFrame(data_results)
-            if len(df_results) > 0:
-                df_results.to_csv(fpath_metrics, sep="\t", index=False)
-
-        print(f"Results saved to {fpath_metrics}")
+        return model
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
@@ -426,7 +223,7 @@ class SklearnWorkflow:
 )
 @click.option(
     "--dataset",
-    "test_datasets",
+    "datasets",
     type=str,
     multiple=True,
     default=DEFAULT_DATASETS,
@@ -445,9 +242,6 @@ class SklearnWorkflow:
     type=int,
     envvar="RANDOM_SEED",
     help="Random state for reproducibility",
-)
-@click.option(
-    "--sloppy", is_flag=True, help="Run Fed-BioMed as fast as possible (for testing)"
 )
 @click.option("--overwrite", is_flag=True, help="Overwrite existing results files")
 def run_without_fedbiomed(**params):

@@ -9,7 +9,6 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 from fl_pd.ml_spec import get_target_from_tag
-from fl_pd.normative_modelling import get_z_scores
 from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS
 
 DEFAULT_MIN_AGE = None
@@ -150,6 +149,8 @@ def split_train_test(
                     df_test, target_col, standardizer=standardizer
                 )
             elif apply_normative_model:
+                from fl_pd.normative_modelling import get_z_scores
+
                 # NOTE this assumes we have SEX and AGE columns in the data
                 data_tag_components = data_tag.split("-")
                 if "hc" in data_tag_components:

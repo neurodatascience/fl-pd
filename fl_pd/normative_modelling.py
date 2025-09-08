@@ -1,7 +1,6 @@
 import os
 import tempfile
 import warnings
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
@@ -18,6 +17,7 @@ except ImportError:
         "in a separate environment."
     )
 
+from fl_pd.io import working_directory
 from fl_pd.utils.freesurfer import fs_to_pcn
 from fl_pd.utils.constants import (
     COLS_PHENO,
@@ -221,13 +221,3 @@ def _get_z_scores_for_idp(
         inputsuffix="estimate",
     )
     return z_scores
-
-
-@contextmanager
-def working_directory(dpath):
-    dpath_old = Path.cwd()
-    os.chdir(dpath)
-    try:
-        yield
-    finally:
-        os.chdir(dpath_old)

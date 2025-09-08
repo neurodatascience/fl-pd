@@ -1,5 +1,8 @@
 import datetime
+import os
+from contextlib import contextmanager
 from pathlib import Path
+
 
 import numpy as np
 import pandas as pd
@@ -69,3 +72,13 @@ def load_Xy(
         return X, y, table_vectorizer
     else:
         return X, y
+
+
+@contextmanager
+def working_directory(dpath):
+    dpath_old = Path.cwd()
+    os.chdir(dpath)
+    try:
+        yield
+    finally:
+        os.chdir(dpath_old)

@@ -19,6 +19,8 @@ NODE_MAP = {
     "adni": "node-adni",
     "ppmi": "node-ppmi",
     "qpn": "node-qpn",
+    "pad": "node-pad",
+    "calgary": "node-calgary",
 }
 
 
@@ -32,10 +34,10 @@ def _get_dataset_name(fname) -> str:
 def _get_data_tag(fname) -> str:
     for substring in TAG_TO_ML_TARGET_MAP.keys():
         for suffix in ["-standardized", ""]:
-            substring = f"{substring}{suffix}"
-            if substring in fname:
-                return substring
-    raise ValueError(f"Invalid data tag for {fname=}")
+            substring_with_suffix = f"{substring}{suffix}"
+            if substring_with_suffix in fname:
+                return substring_with_suffix
+    raise ValueError(f"No data tag found for {fname=}")
 
 
 def _get_i_train(fname) -> int:
