@@ -16,7 +16,7 @@ source config/.env
 ./scripts/get_data-qpn.py $FPATH_QPN_DEMOGRAPHICS $FPATH_QPN_AGE $FPATH_QPN_DIAGNOSIS $FPATH_QPN_MOCA $FPATH_QPN_ASEG $FPATH_QPN_APARC $DPATH_FL_DATA
 
 # extract columns
-./scripts/subset_data.py --dropna COG_DECLINE --decline --age --sex --no-diag --cases --no-controls --aparc --no-aseg $DPATH_FL_DATA_LATEST {adni,calgary,pad,ppmi,qpn}
+./scripts/subset_data.py --dropna COG_DECLINE --decline --age --sex --no-diag --cases --controls --aparc --no-aseg $DPATH_FL_DATA_LATEST {adni,calgary,pad,ppmi,qpn}
 ./scripts/subset_data.py --dropna AGE --no-decline --age --sex --no-diag --no-cases --controls --no-aparc --aseg $DPATH_FL_DATA_LATEST {adni,calgary,pad,ppmi,qpn}
 # ./scripts/subset_data.py --dropna DIAGNOSIS --no-decline --age --sex --diag --cases --controls --aparc --aseg $DPATH_FL_DATA_LATEST {adni,calgary,ppmi,qpn}
 
@@ -28,7 +28,7 @@ source config/.env
 
 # split into training and testing sets
 # no normative model (also no z-scoring)
-./scripts/split_train_test.py --n-splits 10 --stratify-col COG_DECLINE --shuffle --no-standardize --random-state $RANDOM_SEED --tag-adaptation decline-age-sex-diag-hc-aparc-aseg --no-norm $DPATH_FL_DATA_LATEST $DPATH_NORMATIVE_MODELLING_DATA {adni,calgary,pad,ppmi,qpn}-decline-age-sex-case-aparc
+./scripts/split_train_test.py --n-splits 10 --stratify-col COG_DECLINE --shuffle --no-standardize --random-state $RANDOM_SEED --tag-adaptation decline-age-sex-diag-hc-aparc-aseg --no-norm $DPATH_FL_DATA_LATEST $DPATH_NORMATIVE_MODELLING_DATA {adni,calgary,pad,ppmi,qpn}-decline-age-sex-case-hc-aparc
 ./scripts/split_train_test.py --n-splits 10 --stratify-col AGE --shuffle --no-standardize --random-state $RANDOM_SEED --tag-adaptation decline-age-sex-diag-hc-aparc-aseg --no-norm $DPATH_FL_DATA_LATEST $DPATH_NORMATIVE_MODELLING_DATA {adni,calgary,pad,ppmi,qpn}-age-sex-hc-aseg
 # ./scripts/split_train_test.py --n-splits 10 --stratify-col AGE --min-age 55 --shuffle --no-standardize --random-state $RANDOM_SEED --tag-adaptation decline-age-sex-diag-hc-aparc-aseg --no-norm $DPATH_FL_DATA_LATEST $DPATH_NORMATIVE_MODELLING_DATA {adni,ppmi,qpn,pad}-age-sex-hc-aseg
 # ./scripts/split_train_test.py --n-splits 10 --stratify-col DIAGNOSIS --shuffle --no-standardize --random-state $RANDOM_SEED --tag-adaptation decline-age-sex-diag-hc-aparc-aseg --no-norm $DPATH_FL_DATA_LATEST $DPATH_NORMATIVE_MODELLING_DATA {adni,ppmi,qpn}-age-sex-diag-case-hc-aparc-aseg
@@ -42,7 +42,7 @@ source config/.env
 
 # combine for mega-analysis case
 # no normative model (also no z-scoring)
-parallel ./scripts/get_data-mega.py --tag decline-age-sex-case-aparc --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA_LATEST adni calgary pad ppmi qpn ::: {0..9}
+parallel ./scripts/get_data-mega.py --tag decline-age-sex-case-hc-aparc --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA_LATEST adni calgary pad ppmi qpn ::: {0..9}
 parallel ./scripts/get_data-mega.py --tag age-sex-hc-aseg --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA_LATEST adni calgary pad ppmi qpn ::: {0..9}
 # parallel ./scripts/get_data-mega.py --tag age-sex-hc-aseg-55 --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA_LATEST adni ppmi qpn ::: {0..9}
 # parallel ./scripts/get_data-mega.py --tag age-sex-diag-case-hc-aparc-aseg --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA_LATEST adni ppmi qpn ::: {0..9}
@@ -80,7 +80,7 @@ fedbiomed node -p ./fedbiomed/node-qpn start
 
 # run non-Fed-BioMed implementation
 # no normative model (also no z-scoring)
-./scripts/run_without_fedbiomed.py --tag decline-age-sex-case-aparc  --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
+./scripts/run_without_fedbiomed.py --tag decline-age-sex-case-hc-aparc  --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 ./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # ./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg-55 --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # ./scripts/run_without_fedbiomed.py --tag age-sex-diag-case-hc-aparc-aseg  --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
