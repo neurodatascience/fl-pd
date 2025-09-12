@@ -23,7 +23,9 @@ from fl_pd.base_workflow import (
     KnownError,
     DEFAULT_N_ITER_NULL,
     DEFAULT_DATASETS,
+    DEFAULT_N_SPLITS,
     DEFAULT_SETUPS,
+    DEFAULT_STANDARDIZE,
 )
 from fl_pd.federation import (
     average_params,
@@ -105,12 +107,14 @@ class SklearnWorkflow(BaseWorkflow):
         *args,
         n_rounds: int = DEFAULT_N_ROUNDS,
         model_type: SklearnModelType = DEFAULT_MODEL_TYPE,
+        standardize: bool = DEFAULT_STANDARDIZE,
         with_scaler: bool = False,
         **kwargs,
     ):
         super().__init__(*args, framework=MlFramework.SKLEARN, **kwargs)
         self.n_rounds = n_rounds
         self.model_type = model_type
+        self.standardize = standardize
         self.with_scaler = with_scaler
         self.model = self._get_model()
 
@@ -149,6 +153,11 @@ class SklearnWorkflow(BaseWorkflow):
             / f"{dataset_str}-{self.data_tags}-{i_split}train.tsv"
         )
 
+        if self.standardize:
+            fpath_stats = self.get_fpath_stats(setup, i_split, dataset)
+        else:
+            fpath_stats = None
+
         X, y = load_Xy(
             fpath,
             target_cols=[self.target_col],
@@ -156,6 +165,7 @@ class SklearnWorkflow(BaseWorkflow):
             dataset=dataset,
             datasets=self.datasets,
             null=null,
+            fpath_stats=fpath_stats,
         )
         if squeeze:
             y = y.squeeze(axis=1)
@@ -235,6 +245,11 @@ class SklearnWorkflow(BaseWorkflow):
     type=click.Choice(SklearnModelType, case_sensitive=False),
     default=DEFAULT_MODEL_TYPE,
 )
+@click.option(
+    "--standardize/--no-standardize",
+    default=DEFAULT_STANDARDIZE,
+    help="Standardize train and test data based on train data mean/std",
+)
 @click.option("--with-scaler/--no-scaler", default=DEFAULT_WITH_SCALER)
 @click.option(
     "--n-rounds",
@@ -257,7 +272,7 @@ class SklearnWorkflow(BaseWorkflow):
     default=DEFAULT_DATASETS,
     help="Dataset to use for training/testing.",
 )
-@click.option("--n-splits", type=click.IntRange(min=1), default=1)
+@click.option("--n-splits", type=click.IntRange(min=1), default=DEFAULT_N_SPLITS)
 @click.option(
     "--null",
     "n_iter_null",

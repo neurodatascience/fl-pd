@@ -143,6 +143,7 @@ def split_train_test(
             df_test: pd.DataFrame = df.iloc[idx_test]
 
             if standardize:
+                # this standardizes within a dataset only
                 target_col = get_target_from_tag(data_tag).value.upper()
                 df_train, standardizer = _standardize_features(df_train, target_col)
                 df_test, _ = _standardize_features(

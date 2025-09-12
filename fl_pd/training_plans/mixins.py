@@ -32,12 +32,14 @@ class DataLoaderMixin:
         n_targets = model_args["n_features"]
         shuffle = model_args.get("shuffle", False)
         null = model_args.get("null", False)
+        fpath_stats = model_args.get("fpath_stats", None)
 
         X_train, y_train, table_vectorizer = load_Xy(
             self.dataset_path,
             target_cols=target_cols,
             return_vectorizer=True,
             null=null,
+            fpath_stats=fpath_stats,
         )
         self.table_vectorizer_ = table_vectorizer
 

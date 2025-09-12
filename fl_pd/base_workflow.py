@@ -15,6 +15,7 @@ DEFAULT_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")
 DEFAULT_N_SPLITS = 1
 DEFAULT_N_ITER_NULL = 1
 DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
+DEFAULT_STANDARDIZE = False
 
 
 class KnownError(Exception):
@@ -29,6 +30,7 @@ class BaseWorkflow(ABC):
         data_tags: str,
         framework: MlFramework,
         setups: Iterable[MlSetup] = DEFAULT_SETUPS,
+        standardize: bool = DEFAULT_STANDARDIZE,
         datasets: Iterable[str] = DEFAULT_DATASETS,
         n_splits: int = DEFAULT_N_SPLITS,
         n_iter_null: int = DEFAULT_N_ITER_NULL,
@@ -42,6 +44,7 @@ class BaseWorkflow(ABC):
         self.data_tags = data_tags
         self.framework = framework
         self.setups = setups
+        self.standardize = standardize
         self.datasets = datasets
         self.n_splits = n_splits
         self.n_iter_null = n_iter_null
@@ -55,18 +58,46 @@ class BaseWorkflow(ABC):
 
     @property
     def results_suffix(self) -> str:
-        return f"{self.n_splits}_splits-{self.n_iter_null}_null-{self.random_state}"
+        suffix_components = []
+        if self.standardize:
+            suffix_components.append("standardize")
+        else:
+            suffix_components.append("no_standardize")
+        suffix_components.extend(
+            [
+                f"{self.n_splits}_splits",
+                f"{self.n_iter_null}_null",
+                f"{self.random_state}",
+            ]
+        )
+        return "-".join(suffix_components)
 
     @property
     def settings(self) -> dict:
         settings = self.__dict__.copy()
         for key, value in settings.items():
-            if isinstance(value, tuple):
+            if isinstance(value, (tuple, bool, int, float)):
                 continue
             if isinstance(value, Path):
                 value = value.resolve()
             settings[key] = str(value)
         return settings
+
+    def get_fpath_stats(self, setup: MlSetup, i_split: int, train_dataset: str) -> Path:
+        if setup == MlSetup.SILO:
+            dataset_str = train_dataset
+        else:
+            dataset_str = "_".join(["mega"] + list(sorted(self.datasets)))
+
+        fpath_stats = (
+            self.dpath_data
+            / f"{dataset_str}-{self.data_tags}"
+            / f"{dataset_str}-{self.data_tags}-{i_split}train-stats.tsv"
+        )
+        if not fpath_stats.exists():
+            raise KnownError(f"Stats file not found: {fpath_stats}")
+
+        return fpath_stats
 
     def get_test_data(self, i_split: int, setup: MlSetup):
         Xy_test_all = {}
@@ -78,12 +109,19 @@ class BaseWorkflow(ABC):
                 / f"{col_dataset}-{self.data_tags}"
                 / f"{col_dataset}-{self.data_tags}-{i_split}test.tsv"
             )
+
+            if self.standardize:
+                fpath_stats = self.get_fpath_stats(setup, i_split, col_dataset)
+            else:
+                fpath_stats = None
+
             X_test, y_test = load_Xy(
                 fpath,
                 target_cols=[self.target_col],
                 setup=setup,
                 dataset=col_dataset,
                 datasets=self.datasets,
+                fpath_stats=fpath_stats,
             )
 
             if n_features is None:

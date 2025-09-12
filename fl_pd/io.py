@@ -9,6 +9,7 @@ import pandas as pd
 from skrub import TableVectorizer
 
 from fl_pd.utils.constants import MlSetup, DNAME_LATEST, DATE_FORMAT
+from fl_pd.utils.stats import standardize_df
 
 
 def get_dpath_latest(dpath_parent, use_today=False):
@@ -40,12 +41,17 @@ def load_Xy(
     setup=None,
     datasets=None,
     null=False,
+    fpath_stats=None,
 ):
     is_mega = setup == MlSetup.MEGA
 
     df: pd.DataFrame = pd.read_csv(fpath, sep="\t")
     df = df.set_index("participant_id")
     df = df.dropna(axis="index", how="any")
+
+    if fpath_stats is not None:
+        cols_to_ignore = target_cols + (["dataset"] if is_mega else [])
+        df = standardize_df(df, fpath_stats, cols_to_ignore=cols_to_ignore)
 
     table_vectorizer = TableVectorizer()
     df = table_vectorizer.fit_transform(df)

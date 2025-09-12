@@ -14,6 +14,7 @@ from fl_pd.base_workflow import (
     DEFAULT_N_ITER_NULL,
     DEFAULT_N_SPLITS,
     DEFAULT_SETUPS,
+    DEFAULT_STANDARDIZE,
 )
 from fl_pd.io import working_directory
 from fl_pd.utils.constants import (
@@ -76,7 +77,7 @@ class FedbiomedWorkflow(BaseWorkflow):
             raise KnownError(f"Config file not found: {self.fpath_config}")
         return load(self.fpath_config.read_text(), Loader)
 
-    def _get_model_args(self, n_features, n_targets, null=False):
+    def _get_model_args(self, n_features, n_targets, null=False, fpath_stats=None):
         model_args = {
             "eta0": 0.05,  # NativeSklearnOptimizer
             "learning_rate": "invscaling",  # NativeSklearnOptimizer
@@ -87,6 +88,7 @@ class FedbiomedWorkflow(BaseWorkflow):
             "shuffle": True,
             "problem_type": self.problem.value,
             "null": null,
+            "fpath_stats": str(fpath_stats) if fpath_stats is not None else None,
         }
         if self.problem == MlProblem.CLASSIFICATION:
             model_args["n_classes"] = 2
@@ -130,6 +132,11 @@ class FedbiomedWorkflow(BaseWorkflow):
         elif setup == MlSetup.MEGA:
             nodes = ["NODE_MEGA"]
 
+        if self.standardize:
+            fpath_stats = self.get_fpath_stats(setup, i_split, train_dataset)
+        else:
+            fpath_stats = None
+
         # Fed-BioMed experiment
         with working_directory(self.dpath_fedbiomed):
             # from fedbiomed.common.optimizers.optimizer import Optimizer
@@ -141,7 +148,9 @@ class FedbiomedWorkflow(BaseWorkflow):
                 nodes=nodes,
                 tags=self.fedbiomed_tags + [f"{i_split}train"],
                 training_plan_class=self._get_training_plan(),
-                model_args=self._get_model_args(n_features, n_targets, null=null),
+                model_args=self._get_model_args(
+                    n_features, n_targets, null=null, fpath_stats=fpath_stats
+                ),
                 round_limit=fbm_training_config["rounds"],
                 training_args=fbm_training_config["training_args"],
                 aggregator=FedAverage(),
@@ -208,6 +217,11 @@ class FedbiomedWorkflow(BaseWorkflow):
     type=str,
     default=DEFAULT_SGDR_LOSS,
     help="Loss for Sklearn SGDRegressor",
+)
+@click.option(
+    "--standardize/--no-standardize",
+    default=DEFAULT_STANDARDIZE,
+    help="Standardize train and test data based on train data mean/std",
 )
 @click.option(
     "--dataset",
