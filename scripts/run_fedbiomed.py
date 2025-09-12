@@ -67,6 +67,7 @@ class FedbiomedWorkflow(BaseWorkflow):
     def settings(self) -> dict:
         settings = super().settings
         settings["model_args"] = self._get_model_args(None, None)
+        settings["_fbm_configs"] = self._fbm_configs
         return settings
 
     @cached_property
