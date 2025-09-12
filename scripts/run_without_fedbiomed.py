@@ -38,73 +38,95 @@ from fl_pd.utils.constants import (
     MlProblem,
     MlSetup,
     MlTarget,
+    SklearnModelType,
 )
 
 DEFAULT_N_ROUNDS = 1
+DEFAULT_MODEL_TYPE = SklearnModelType.RIDGE
+DEFAULT_WITH_SCALER = False
 
 MODEL_MAP = {
-    # Ridge
-    MlTarget.AGE: partial(Ridge),
-    MlTarget.COG_DECLINE: partial(
-        LogisticRegression,
-        max_iter=1000,
-        class_weight="balanced",
-        warm_start=True,
-        solver="lbfgs",
-    ),
-    MlTarget.DIAGNOSIS: partial(
-        LogisticRegression,
-        max_iter=1000,
-        class_weight="balanced",
-        warm_start=True,
-        solver="lbfgs",
-    ),
-    MlTarget.MMSE: partial(Ridge),
-    # # Lasso
-    # MlTarget.AGE: partial(Lasso),
-    # MlTarget.COG_DECLINE: partial(
-    #     LogisticRegression,
-    #     penalty="l1",
-    #     max_iter=1000,
-    #     class_weight="balanced",
-    #     warm_start=True,
-    #     solver="liblinear",
-    # ),
-    # MlTarget.DIAGNOSIS: partial(
-    #     LogisticRegression,
-    #     penalty="l1",
-    #     max_iter=1000,
-    #     class_weight="balanced",
-    #     warm_start=True,
-    #     solver="liblinear",
-    # ),
-    # MlTarget.MMSE: partial(Lasso),
-    # # SGD
-    # MlTarget.AGE: partial(SGDRegressor, warm_start=True),
-    # MlTarget.COG_DECLINE: partial(
-    #     SGDClassifier, class_weight="balanced", warm_start=True
-    # ),
-    # MlTarget.DIAGNOSIS: partial(
-    #     SGDClassifier, class_weight="balanced", warm_start=True
-    # ),
-    # MlTarget.MMSE: partial(SGDRegressor, warm_start=True),
+    SklearnModelType.RIDGE: {
+        MlTarget.AGE: partial(Ridge),
+        MlTarget.COG_DECLINE: partial(
+            LogisticRegression,
+            max_iter=1000,
+            class_weight="balanced",
+            warm_start=True,
+            solver="lbfgs",
+        ),
+        MlTarget.DIAGNOSIS: partial(
+            LogisticRegression,
+            max_iter=1000,
+            class_weight="balanced",
+            warm_start=True,
+            solver="lbfgs",
+        ),
+        MlTarget.MMSE: partial(Ridge),
+    },
+    SklearnModelType.LASSO: {
+        MlTarget.AGE: partial(Lasso),
+        MlTarget.COG_DECLINE: partial(
+            LogisticRegression,
+            penalty="l1",
+            max_iter=1000,
+            class_weight="balanced",
+            warm_start=True,
+            solver="liblinear",
+        ),
+        MlTarget.DIAGNOSIS: partial(
+            LogisticRegression,
+            penalty="l1",
+            max_iter=1000,
+            class_weight="balanced",
+            warm_start=True,
+            solver="liblinear",
+        ),
+        MlTarget.MMSE: partial(Lasso),
+    },
+    SklearnModelType.SGD: {
+        MlTarget.AGE: partial(SGDRegressor, warm_start=True),
+        MlTarget.COG_DECLINE: partial(
+            SGDClassifier, class_weight="balanced", warm_start=True
+        ),
+        MlTarget.DIAGNOSIS: partial(
+            SGDClassifier, class_weight="balanced", warm_start=True
+        ),
+        MlTarget.MMSE: partial(SGDRegressor, warm_start=True),
+    },
 }
 
 warnings.filterwarnings(action="ignore", message="X has feature names")
 
 
 class SklearnWorkflow(BaseWorkflow):
-    def __init__(self, *args, n_rounds: int = DEFAULT_N_ROUNDS, **kwargs):
+    def __init__(
+        self,
+        *args,
+        n_rounds: int = DEFAULT_N_ROUNDS,
+        model_type: SklearnModelType = DEFAULT_MODEL_TYPE,
+        with_scaler: bool = False,
+        **kwargs,
+    ):
         super().__init__(*args, framework=MlFramework.SKLEARN, **kwargs)
         self.n_rounds = n_rounds
+        self.model_type = model_type
+        self.with_scaler = with_scaler
         self.model = self._get_model()
 
+    @property
     def results_suffix(self) -> str:
-        return f"pure_sklearn-{super().results_suffix}"
+        tags = ["pure_sklearn", self.model_type.value]
+        if self.with_scaler:
+            tags.append("with_scaler")
+        else:
+            tags.append("no_scaler")
+        tags.append(super().results_suffix)
+        return "-".join(tags)
 
     def _get_model(self):
-        model = MODEL_MAP[self.target](random_state=self.random_state)
-        if "standardized" not in self.data_tags and "norm" not in self.data_tags:
+        model = MODEL_MAP[self.model_type][self.target](random_state=self.random_state)
+        if self.with_scaler:
             model = make_pipeline(StandardScaler(), model)
         return model
 
@@ -208,6 +230,12 @@ class SklearnWorkflow(BaseWorkflow):
     envvar="DPATH_FL_RESULTS",
 )
 @click.option("--tag", "data_tags", required=True)
+@click.option(
+    "--model-type",
+    type=click.Choice(SklearnModelType, case_sensitive=False),
+    default=DEFAULT_MODEL_TYPE,
+)
+@click.option("--with-scaler/--no-scaler", default=DEFAULT_WITH_SCALER)
 @click.option(
     "--n-rounds",
     type=click.IntRange(min=1),

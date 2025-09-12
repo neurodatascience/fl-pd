@@ -51,3 +51,11 @@ class MlTarget(str, enum.Enum):
     AGE = "age"
     DIAGNOSIS = "diagnosis"
     MMSE = "mmse"
+
+
+class SklearnModelType(str, enum.Enum):
+    """For non-Fed-BioMed implementation."""
+
+    RIDGE = "ridge"
+    LASSO = "lasso"
+    SGD = "sgd"
