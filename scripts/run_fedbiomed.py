@@ -153,7 +153,7 @@ class FedbiomedWorkflow(BaseWorkflow):
             try:
                 experiment.run()
             except SystemExit:
-                return []
+                return None
 
         # get final model
         experiment.training_plan().set_model_params(

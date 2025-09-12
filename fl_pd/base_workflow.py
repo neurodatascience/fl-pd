@@ -153,6 +153,9 @@ class BaseWorkflow(ABC):
             train_dataset=train_dataset,
         )
 
+        if model is None:
+            return []  # skip evaluation if model training failed
+
         metrics_map = get_metrics_map(self.problem)
         for test_dataset in Xy_test_all.keys():
             X_test, y_test = Xy_test_all[test_dataset]
