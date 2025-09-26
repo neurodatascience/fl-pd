@@ -60,6 +60,9 @@ parallel ./scripts/get_data-mega.py --tag age-sex-hc-aseg-standardized --suffix 
 # # simulated data
 # parallel ./scripts/get_data-mega.py --tag simulated-standardized --suffix '-{}train' --random-state $RANDOM_SEED $DPATH_FL_DATA_LATEST site1 site2 site3 ::: {0..9}
 
+parallel ./scripts/get_statistics.py --tag decline-age-sex-case-hc-aparc --suffix '-{}train' $DPATH_FL_DATA_LATEST adni calgary pad ppmi qpn mega_adni_calgary_pad_ppmi_qpn ::: {0..9}
+parallel ./scripts/get_statistics.py --tag age-sex-hc-aseg --suffix '-{}train' $DPATH_FL_DATA_LATEST adni calgary pad ppmi qpn mega_adni_calgary_pad_ppmi_qpn ::: {0..9}
+
 # create the nodes
 fedbiomed component create -p ./fedbiomed/node-mega -c NODE
 fedbiomed component create -p ./fedbiomed/node-adni -c NODE
@@ -83,14 +86,16 @@ fedbiomed node -p ./fedbiomed/node-pad start
 fedbiomed node -p ./fedbiomed/node-calgary start
 
 # run Fed-BioMed
-./scripts/run_fedbiomed.py --tag decline-age-sex-case-hc-aparc-standardized --sgdc-loss log_loss --framework sklearn --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_FEDBIOMED $FPATH_FEDBIOMED_CONFIG
-./scripts/run_fedbiomed.py --tag age-sex-hc-aseg-standardized --framework sklearn --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_FEDBIOMED $FPATH_FEDBIOMED_CONFIG
+./scripts/run_fedbiomed.py --tag decline-age-sex-case-hc-aparc --sgdc-loss log_loss --standardize --framework sklearn --n-splits 10 --null 0 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_FEDBIOMED $FPATH_FEDBIOMED_CONFIG
+./scripts/run_fedbiomed.py --tag age-sex-hc-aseg --standardize --framework sklearn --n-splits 10 --null 0 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_FEDBIOMED $FPATH_FEDBIOMED_CONFIG
+# ./scripts/run_fedbiomed.py --tag decline-age-sex-case-hc-aparc-standardized --sgdc-loss log_loss --framework sklearn --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_FEDBIOMED $FPATH_FEDBIOMED_CONFIG
+# ./scripts/run_fedbiomed.py --tag age-sex-hc-aseg-standardized --framework sklearn --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_FEDBIOMED $FPATH_FEDBIOMED_CONFIG
 # ./scripts/run_fedbiomed.py --tag simulated-standardized --dataset site1 --dataset site2 --dataset site3 --framework sklearn --n-splits 1 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS $DPATH_RESEARCHER $FPATH_FEDBIOMED_CONFIG --sloppy --null
 
 # run non-Fed-BioMed implementation
 # no normative model (also no z-scoring)
-./scripts/run_without_fedbiomed.py --tag decline-age-sex-case-hc-aparc  --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
-./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
+./scripts/run_without_fedbiomed.py --tag decline-age-sex-case-hc-aparc --no-scaler --standardize --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
+./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg --no-scaler --standardize --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # ./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg-55 --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # ./scripts/run_without_fedbiomed.py --tag age-sex-diag-case-hc-aparc-aseg  --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # no normative model but with z-scoring
@@ -101,4 +106,3 @@ fedbiomed node -p ./fedbiomed/node-calgary start
 # # ./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg-55-norm --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # ./scripts/run_without_fedbiomed.py --tag age-sex-hc-aseg-norm --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
 # ./scripts/run_without_fedbiomed.py --tag age-sex-diag-case-hc-aparc-aseg-norm  --n-rounds 3 --n-splits 10 --null 10 $DPATH_FL_DATA_LATEST $DPATH_FL_RESULTS
-

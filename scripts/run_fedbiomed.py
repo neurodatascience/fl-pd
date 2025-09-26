@@ -57,10 +57,6 @@ class FedbiomedWorkflow(BaseWorkflow):
         framework_tags = "fbm"
         if self.framework == MlFramework.SKLEARN:
             framework_tags += "_sklearn"
-            if self.problem == MlProblem.CLASSIFICATION:
-                framework_tags += f"-{self.sgdc_loss}"
-            elif self.problem == MlProblem.REGRESSION:
-                framework_tags += f"-{self.sgdr_loss}"
 
         return f"{framework_tags}-{suffix}"
 

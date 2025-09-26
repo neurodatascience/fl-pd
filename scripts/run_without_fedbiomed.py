@@ -125,6 +125,7 @@ class SklearnWorkflow(BaseWorkflow):
             tags.append("with_scaler")
         else:
             tags.append("no_scaler")
+        tags.append(f"{self.n_rounds}_rounds")
         tags.append(super().results_suffix)
         return "-".join(tags)
 
