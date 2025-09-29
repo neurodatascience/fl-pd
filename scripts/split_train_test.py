@@ -124,7 +124,7 @@ def split_train_test(
             data_tag = f"{data_tag}-norm"
 
         if stratify_col == "AGE":
-            age_bins = np.arange(0, 100, 10)
+            age_bins = np.arange(0, 100, 5)
             stratify = pd.cut(df["AGE"], bins=age_bins).astype(str)
         elif stratify_col in df.columns:
             stratify = df[stratify_col]

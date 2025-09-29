@@ -122,6 +122,8 @@ def _add_data_to_node(fpath_tsv: Path, dpath_nodes: Path):
 def add_data_to_nodes(dpath_data: Path, dpath_nodes: Path):
     fpaths_tsv = dpath_data.glob("**/*train*.tsv")
     for fpath_tsv in sorted(fpaths_tsv):
+        if "stats" in str(fpath_tsv):
+            continue
         print(f"----- {fpath_tsv} -----")
         _add_data_to_node(fpath_tsv, dpath_nodes)
 
