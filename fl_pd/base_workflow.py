@@ -1,4 +1,5 @@
 import json
+import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Generator, Iterable, Optional
@@ -35,6 +36,7 @@ class BaseWorkflow(ABC):
         n_splits: int = DEFAULT_N_SPLITS,
         n_iter_null: int = DEFAULT_N_ITER_NULL,
         random_state: Optional[int] = None,
+        save_model: bool = False,
         overwrite: bool = False,
     ):
         super().__init__()
@@ -49,6 +51,7 @@ class BaseWorkflow(ABC):
         self.n_splits = n_splits
         self.n_iter_null = n_iter_null
         self.random_state = random_state
+        self.save_model = save_model
         self.overwrite = overwrite
 
         self.target = get_target_from_tag(self.data_tags)
@@ -193,6 +196,20 @@ class BaseWorkflow(ABC):
 
         if model is None:
             return []  # skip evaluation if model training failed
+
+        if self.save_model:
+            prefix_model = self.results_suffix
+            if null:
+                prefix_model = f"{prefix_model}-null"
+            prefix_model = f"{prefix_model}-{i_split}-{i_iter}"
+            if setup == MlSetup.SILO:
+                prefix_model += f"-{setup.value}_{train_dataset}"
+            else:
+                prefix_model += f"-{setup.value}"
+            fpath_model = self.dpath_run_results / f"{prefix_model}.pkl"
+            with open(fpath_model, "wb") as file_model:
+                pickle.dump(model, file_model)
+            print(f"Model saved to {fpath_model}")
 
         metrics_map = get_metrics_map(self.problem)
         for test_dataset in Xy_test_all.keys():

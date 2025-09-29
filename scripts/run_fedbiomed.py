@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 import sys
-from functools import cached_property
 from pathlib import Path
 
 import click
-from yaml import load, Loader
 
 from fl_pd.base_workflow import (
     BaseWorkflow,
@@ -24,15 +22,21 @@ from fl_pd.utils.constants import (
     MlFramework,
 )
 
+DEFAULT_N_ROUNDS = 20
+DEFAULT_N_UPDATES = 20
+DEFAULT_BATCH_SIZE = 50
 DEFAULT_SGDC_LOSS = "log_loss"
 DEFAULT_SGDR_LOSS = "squared_error"
+DEFAULT_SAVE_MODEL = False
 
 
 class FedbiomedWorkflow(BaseWorkflow):
     def __init__(
         self,
         dpath_fedbiomed: Path,
-        fpath_config: Path,
+        n_rounds: int = DEFAULT_N_ROUNDS,
+        n_updates: int = DEFAULT_N_UPDATES,
+        batch_size: int = DEFAULT_BATCH_SIZE,
         sgdc_loss: str = DEFAULT_SGDC_LOSS,
         sgdr_loss: str = DEFAULT_SGDR_LOSS,
         sloppy: bool = False,
@@ -40,8 +44,15 @@ class FedbiomedWorkflow(BaseWorkflow):
     ):
         super().__init__(**kwargs)
 
+        if sloppy:
+            n_rounds = 1
+            n_updates = 1
+            batch_size = int(1e6)
+
         self.dpath_fedbiomed = Path(dpath_fedbiomed)
-        self.fpath_config = Path(fpath_config)
+        self.n_rounds = n_rounds
+        self.n_updates = n_updates
+        self.batch_size = batch_size
         self.sgdc_loss = sgdc_loss
         self.sgdr_loss = sgdr_loss
         self.sloppy = sloppy
@@ -58,20 +69,21 @@ class FedbiomedWorkflow(BaseWorkflow):
         if self.framework == MlFramework.SKLEARN:
             framework_tags += "_sklearn"
 
-        return f"{framework_tags}-{suffix}"
+        tags = [
+            framework_tags,
+            f"{self.n_rounds}_rounds",
+            f"{self.n_updates}_updates",
+            f"{self.batch_size}_batch_size",
+            suffix,
+        ]
+
+        return "-".join(tags)
 
     @property
     def settings(self) -> dict:
         settings = super().settings
         settings["model_args"] = self._get_model_args(None, None)
-        settings["_fbm_configs"] = self._fbm_configs
         return settings
-
-    @cached_property
-    def _fbm_configs(self) -> dict:
-        if not self.fpath_config.exists():
-            raise KnownError(f"Config file not found: {self.fpath_config}")
-        return load(self.fpath_config.read_text(), Loader)
 
     def _get_model_args(self, n_features, n_targets, null=False, fpath_stats=None):
         model_args = {
@@ -85,6 +97,7 @@ class FedbiomedWorkflow(BaseWorkflow):
             "problem_type": self.problem.value,
             "null": null,
             "fpath_stats": str(fpath_stats) if fpath_stats is not None else None,
+            "penalty": "l2",
         }
         if self.problem == MlProblem.CLASSIFICATION:
             model_args["n_classes"] = 2
@@ -117,10 +130,6 @@ class FedbiomedWorkflow(BaseWorkflow):
         null: bool,
         train_dataset: str,
     ):
-        fbm_training_config = self._fbm_configs[
-            setup.value if not self.sloppy else "fast"
-        ]
-
         if setup == MlSetup.SILO:
             nodes = [f"NODE_{train_dataset.upper()}"]
         elif setup == MlSetup.FEDERATED:
@@ -135,8 +144,6 @@ class FedbiomedWorkflow(BaseWorkflow):
 
         # Fed-BioMed experiment
         with working_directory(self.dpath_fedbiomed):
-            # from fedbiomed.common.optimizers.optimizer import Optimizer
-            # from fedbiomed.common.optimizers.declearn import YogiModule as FedYogi
             from fedbiomed.researcher.federated_workflows import Experiment
             from fedbiomed.researcher.aggregators.fedavg import FedAverage
 
@@ -147,13 +154,12 @@ class FedbiomedWorkflow(BaseWorkflow):
                 model_args=self._get_model_args(
                     n_features, n_targets, null=null, fpath_stats=fpath_stats
                 ),
-                round_limit=fbm_training_config["rounds"],
-                training_args=fbm_training_config["training_args"],
+                round_limit=self.n_rounds,
+                training_args={
+                    "num_updates": self.n_updates,
+                    "loader_args": {"batch_size": self.batch_size},
+                },
                 aggregator=FedAverage(),
-                # agg_optimizer=Optimizer(
-                #     **fbm_training_config["training_args"]["optimizer_args"],
-                #     modules=[FedYogi()],
-                # ),
                 node_selection_strategy=None,
             )
             try:
@@ -163,7 +169,7 @@ class FedbiomedWorkflow(BaseWorkflow):
 
         # get final model
         experiment.training_plan().set_model_params(
-            experiment.aggregated_params()[fbm_training_config["rounds"] - 1]["params"]
+            experiment.aggregated_params()[self.n_rounds - 1]["params"]
         )
         return experiment.training_plan().model()
 
@@ -184,11 +190,6 @@ class FedbiomedWorkflow(BaseWorkflow):
     type=click.Path(path_type=Path, file_okay=False),
     envvar="DPATH_FEDBIOMED",
 )
-@click.argument(
-    "fpath_config",
-    type=click.Path(path_type=Path, exists=True, dir_okay=False),
-    envvar="FPATH_FEDBIOMED_CONFIG",
-)
 @click.option("--tag", "data_tags", required=True)
 @click.option(
     "--setup",
@@ -202,6 +203,9 @@ class FedbiomedWorkflow(BaseWorkflow):
     type=click.Choice(MlFramework, case_sensitive=False),
     required=True,
 )
+@click.option("--n-rounds", type=click.IntRange(min=1), default=DEFAULT_N_ROUNDS)
+@click.option("--n-updates", type=click.IntRange(min=1), default=DEFAULT_N_UPDATES)
+@click.option("--batch-size", type=click.IntRange(min=1), default=DEFAULT_BATCH_SIZE)
 @click.option(
     "--sgdc-loss",
     type=str,
@@ -240,6 +244,11 @@ class FedbiomedWorkflow(BaseWorkflow):
     type=int,
     envvar="RANDOM_SEED",
     help="Random state for reproducibility",
+)
+@click.option(
+    "--save-model/--no-save-model",
+    default=DEFAULT_SAVE_MODEL,
+    help="Whether to save the trained model(s) to a file",
 )
 @click.option(
     "--sloppy", is_flag=True, help="Run Fed-BioMed as fast as possible (for testing)"
