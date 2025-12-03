@@ -1,5 +1,7 @@
 import enum
 
+TERMURL_COG_DECLINE = "fl:cognitive_decline"
+
 CLICK_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"], "show_default": True}
 
 DATASETS = (
@@ -27,7 +29,7 @@ DNAME_LATEST = "latest"
 DATE_FORMAT = "%Y_%m_%d"
 
 # script-generated files
-DPATH_RELATIVE_PAD_IMAGING_SESSIONS = "pad/imaging_sessions.csv"
+DPATH_RELATIVE_PAD_IMAGING_SESSIONS = "pad/imaging_sessions.tsv"
 
 
 class MlSetup(str, enum.Enum):

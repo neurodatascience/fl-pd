@@ -31,10 +31,14 @@ def cog_decline_from_pad_mci(df_mci: pd.DataFrame) -> pd.DataFrame:
         data_cog_decline.append(
             {
                 "participant_id": participant_id,
-                "COG_DECLINE": (
+                "cog_decline": (
                     "01" in mci_progression and "10" not in mci_progression
                 ),
-                "n_months_switch": n_months_switch,
+                "n_months_switch": (
+                    n_months_switch.item()
+                    if isinstance(n_months_switch, pd.Series)
+                    else n_months_switch
+                ),
             }
         )
     df_cog_decline = pd.DataFrame(data_cog_decline).set_index("participant_id")
