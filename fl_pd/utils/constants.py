@@ -29,7 +29,7 @@ DNAME_LATEST = "latest"
 DATE_FORMAT = "%Y_%m_%d"
 
 # script-generated files
-DPATH_RELATIVE_PAD_IMAGING_SESSIONS = "pad/imaging_sessions.tsv"
+DPATH_RELATIVE_PAD_IMAGING_SESSIONS = "pad_imaging_sessions.tsv"
 
 
 class MlSetup(str, enum.Enum):

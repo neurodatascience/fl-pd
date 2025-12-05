@@ -38,7 +38,8 @@ def choose_pad_imaging_sessions(fpath_manifest: Path, fpath_mci: Path, dpath_out
     df_manifest = df_manifest.query('visit_id != "NAPEN00" and visit_id != "PREEN00"')
 
     # index is participant_id
-    df_cog_decline = cog_decline_from_pad_mci(df_mci)
+    col_cog_decline = "cog_decline"
+    df_cog_decline = cog_decline_from_pad_mci(df_mci, col_cog_decline=col_cog_decline)
 
     data_imaging_sessions = []
     for participant_id, df_manifest_participant in df_manifest.groupby(
@@ -50,10 +51,8 @@ def choose_pad_imaging_sessions(fpath_manifest: Path, fpath_mci: Path, dpath_out
             print(f"Warning: No MCI info for participant {participant_id}")
             session_id = df_manifest_participant["visit_id"].iloc[0]
 
-        elif df_cog_decline.loc[participant_id, "COG_DECLINE"]:
-            n_months_switch = df_cog_decline.loc[
-                participant_id, "n_months_switch"
-            ].item()
+        elif df_cog_decline.loc[participant_id, col_cog_decline]:
+            n_months_switch = df_cog_decline.loc[participant_id, "n_months_switch"]
             df_manifest_participant = df_manifest_participant.query(
                 "n_months < @n_months_switch"
             )

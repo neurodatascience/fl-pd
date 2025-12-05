@@ -12,7 +12,9 @@ def cog_decline_from_mmse_rate(mmse_rate):
     return mmse_rate <= THRESHOLD_MMSE_RATE if not np.isnan(mmse_rate) else np.nan
 
 
-def cog_decline_from_pad_mci(df_mci: pd.DataFrame) -> pd.DataFrame:
+def cog_decline_from_pad_mci(
+    df_mci: pd.DataFrame, col_cog_decline="cog_decline"
+) -> pd.DataFrame:
     data_cog_decline = []
     for participant_id, df_mci_participant in df_mci.groupby("participant_id"):
         df_mci_participant = df_mci_participant.sort_values(
@@ -31,7 +33,7 @@ def cog_decline_from_pad_mci(df_mci: pd.DataFrame) -> pd.DataFrame:
         data_cog_decline.append(
             {
                 "participant_id": participant_id,
-                "cog_decline": (
+                col_cog_decline: (
                     "01" in mci_progression and "10" not in mci_progression
                 ),
                 "n_months_switch": (
