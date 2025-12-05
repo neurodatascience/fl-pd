@@ -1,0 +1,7 @@
+{
+    "script_file": "[[NIPOPPY_DPATH_PIPELINES]]/processing/cog_decline_harmonize-1.0.0/cog_decline_harmonize.py",
+    "tsv_file": "[[PHENO_FILE]]",
+    "json_file": "[[DATA_DICTIONARY_FILE]]",
+    "out_file": "[[NIPOPPY_FPATH_HARMONIZED]]",
+    "work_dir": "[[NIPOPPY_DPATH_PIPELINE_OUTPUT]]"
+}

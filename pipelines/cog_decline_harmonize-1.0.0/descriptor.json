@@ -1,0 +1,79 @@
+{
+    "name": "cog_decline_harmonize",
+    "description": "Harmonize phenotypic data with cognitive decline information",
+    "tool-version": "1.0.0",
+    "schema-version": "0.5",
+    "command-line": "python [SCRIPT_FILE] [TSV_FILE] [JSON_FILE] [OUT_FILE] [ALGORITHM_ID] [WORK_DIR] [COL_COG_DECLINE]",
+    "container-image": {
+        "image": "neurobagel/bagelcli:v0.10.2",
+        "type": "docker"
+    },
+    "inputs": [
+        {
+            "name": "script_file",
+            "id": "script_file",
+            "description": "Path to script to run",
+            "type": "String",
+            "optional": false,
+            "value-key": "[SCRIPT_FILE]"
+        },
+        {
+            "name": "tsv_file",
+            "id": "tsv_file",
+            "description": "Phenotypic data",
+            "type": "String",
+            "optional": false,
+            "value-key": "[TSV_FILE]"
+        },
+        {
+            "name": "json_file",
+            "id": "json_file",
+            "description": "Neurobagel data dictionary",
+            "type": "String",
+            "optional": false,
+            "value-key": "[JSON_FILE]"
+        },
+        {
+            "name": "out_file",
+            "id": "out_file",
+            "description": "Where to write harmonized phenotypic data",
+            "type": "String",
+            "optional": false,
+            "value-key": "[OUT_FILE]"
+        },
+        {
+            "name": "algorithm_id",
+            "id": "algorithm_id",
+            "description": "Algorithm ID",
+            "type": "Number",
+            "optional": true,
+            "default-value": 1,
+            "command-line-flag": "--alg",
+            "value-key": "[ALGORITHM_ID]"
+        },
+        {
+            "name": "work_dir",
+            "id": "work_dir",
+            "description": "Working directory for intermediate files",
+            "type": "String",
+            "optional": true,
+            "command-line-flag": "--work-dir",
+            "value-key": "[WORK_DIR]"
+        },
+        {
+            "name": "col_cog_decline",
+            "id": "col_cog_decline",
+            "description": "If the TSV file already has a cognitive decline column (with True/False/NA), specify the column name here",
+            "type": "String",
+            "optional": true,
+            "command-line-flag": "--col-cog-decline",
+            "value-key": "[COL_COG_DECLINE]"
+        }
+    ],
+    "tags": {},
+    "suggested-resources": {
+        "cpu-cores": 1,
+        "ram": 1,
+        "walltime-estimate": 60
+    }
+}

@@ -1,0 +1,31 @@
+{
+    "NAME": "cog_decline_harmonize",
+    "VERSION": "1.0.0",
+    "CONTAINER_INFO": {
+        "FILE": "[[NIPOPPY_DPATH_CONTAINERS]]/bagelcli_v0.10.2.sif",
+        "URI": "docker://neurobagel/bagelcli:v0.10.2"
+    },
+    "CONTAINER_CONFIG": {
+        "ENV_VARS": {},
+        "ARGS": [
+            "--bind",
+            "[[PHENO_FILE]]:[[PHENO_FILE]]",
+            "--bind",
+            "[[DATA_DICTIONARY_FILE]]:[[DATA_DICTIONARY_FILE]]"
+        ]
+    },
+    "STEPS": [
+        {
+            "INVOCATION_FILE": "invocation.json",
+            "DESCRIPTOR_FILE": "descriptor.json",
+            "ANALYSIS_LEVEL": "group",
+            "GENERATE_PYBIDS_DATABASE": false
+        }
+    ],
+    "PIPELINE_TYPE": "processing",
+    "VARIABLES": {
+        "PHENO_FILE": "Path to TSV file containing phenotypic data (must include age and MoCA/MMSE or cognitive decline columns)",
+        "DATA_DICTIONARY_FILE": "Path to JSON file containing Neurobagel data dictionary"
+    },
+    "SCHEMA_VERSION": "1"
+}
