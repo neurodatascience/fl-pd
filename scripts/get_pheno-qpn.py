@@ -12,6 +12,13 @@ COL_AGE = "age"
 COL_VISIT_ID = "visit_id"
 COL_MOCA = "moca"
 
+MOCA_VISIT_ID_MAP = {
+    "legacy-moca": "legacymoca",
+    "Baseline (Arm 1: C-OPN)": "baselinemoca",
+    "12 Months Follow-Up/Suivi (Arm 1: C-OPN)": "month12moca",
+    "18 Months Follow-Up/Suivi (Arm 1: C-OPN)": "month18moca",
+}
+
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
 @click.argument(
@@ -72,6 +79,7 @@ def get_data_qpn(
             "moca_age": COL_AGE,
         }
     )
+    df_moca[COL_VISIT_ID] = df_moca[COL_VISIT_ID].map(MOCA_VISIT_ID_MAP)
     df_moca = df_moca[[COL_VISIT_ID, COL_MOCA, COL_AGE]]
     df_moca = df_moca.set_index(COL_VISIT_ID, append=True)
 
