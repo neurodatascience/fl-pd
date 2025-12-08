@@ -19,12 +19,10 @@ from fl_pd.utils.constants import CLICK_CONTEXT_SETTINGS, MlSetup, MlProblem
 
 DEFAULT_N_SPLITS = 10
 DEFAULT_N_ITER_NULL = 1
-DEFAULT_SETUPS = [
-    MlSetup.SILO,
-    MlSetup.FEDERATED,
-]  # tuple([setup for setup in MlSetup])
+DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
 DEFAULT_STANDARDIZE = True
 
+DEFAULT_TAG_FEDERATED = "federated"
 DEFAULT_TAG_MEGA = "mega"
 DEFAULT_TRAIN_DATASETS = ("calgary", "pad", "ppmi")  # fedbiomed tags
 DEFAULT_TEST_DATASETS = ("calgary", "pad", "ppmi")  # local datasets
@@ -34,13 +32,7 @@ DEFAULT_N_UPDATES = 20
 DEFAULT_BATCH_SIZE = 50
 DEFAULT_SAVE_MODEL = False
 
-
-# TODO later (important for age, less so for cog decline)
-# standardize with combined means/stds
-# run a script at each site, then put in nipoppy root directory?
-
-# null models to be handled in model args/CustomDataset as well
-# TODO null models for Federated have problems for age
+# TODO null models for Federated have problems for age due to data distribution differences
 
 TARGET_PROBLEM_MAP = {
     "nb:Age": MlProblem.REGRESSION,
@@ -60,6 +52,7 @@ class FedbiomedWorkflow:
         dpath_data: Path,
         dpath_results: Path,
         dpath_fedbiomed: Path,
+        dpath_stats: Path,
         train_datasets: Iterable[str] = DEFAULT_TRAIN_DATASETS,
         test_datasets: Iterable[str] = DEFAULT_TEST_DATASETS,
         setups: Iterable[MlSetup] = DEFAULT_SETUPS,
@@ -73,6 +66,7 @@ class FedbiomedWorkflow:
         n_updates: int = DEFAULT_N_UPDATES,
         batch_size: int = DEFAULT_BATCH_SIZE,
         sloppy: bool = False,
+        tag_federated: str = DEFAULT_TAG_FEDERATED,
         tag_mega: str = DEFAULT_TAG_MEGA,
     ):
         super().__init__()
@@ -85,7 +79,8 @@ class FedbiomedWorkflow:
         self.target = target
         self.dpath_data = Path(dpath_data)
         self.dpath_results = Path(dpath_results)
-        self.train_datasets = train_datasets
+        self.dpath_stats = Path(dpath_stats)
+        self.train_datasets: list = list(train_datasets)
         self.test_datasets = test_datasets
         self.setups = setups
         self.standardize = standardize
@@ -94,6 +89,7 @@ class FedbiomedWorkflow:
         self.random_state = random_state
         self.save_model = save_model
         self.overwrite = overwrite
+        self.tag_federated = tag_federated
         self.tag_mega = tag_mega
         self.dpath_fedbiomed = Path(dpath_fedbiomed)
         self.n_rounds = n_rounds
@@ -151,22 +147,15 @@ class FedbiomedWorkflow:
     def training_plan(self) -> Type[BaseTrainingPlan]:
         return training_plan_factory(self.target)
 
-    def get_fpath_stats(self, setup: MlSetup, i_split: int, train_dataset: str) -> Path:
-        # # TODO
-        # if setup == MlSetup.SILO:
-        #     dataset_str = train_dataset
-        # else:
-        #     dataset_str = "_".join(["mega"] + list(sorted(self.datasets)))
+    def get_fname_stats(self, setup: MlSetup, i_split: int, train_dataset: str) -> Path:
+        if setup == MlSetup.SILO:
+            dataset_str = train_dataset
+        else:
+            # TODO maybe different for federated if not all datasets are known
+            dataset_str = "_".join([self.tag_mega] + sorted(self.train_datasets))
 
-        # fpath_stats = (
-        #     self.dpath_data
-        #     / f"{dataset_str}-{self.data_tags}"
-        #     / f"{dataset_str}-{self.data_tags}-{i_split}train-stats.tsv"
-        # )
-        # if not fpath_stats.exists():
-        #     raise KnownError(f"Stats file not found: {fpath_stats}")
-        fpath_stats = None
-        return fpath_stats
+        fname_stats = f"{dataset_str}-{self.target}-{self.n_splits}splits-rng{self.random_state}-{i_split}.tsv"
+        return fname_stats
 
     def get_test_data(self, i_split: int, setup: MlSetup):
         Xy_test_all = {}
@@ -180,9 +169,9 @@ class FedbiomedWorkflow:
                 raise KnownError(f"Local dataset not found: {dpath_dataset}")
 
             if self.standardize:
-                fpath_stats = self.get_fpath_stats(setup, i_split, dataset_name)
+                fname_stats = self.get_fname_stats(setup, i_split, dataset_name)
             else:
-                fpath_stats = None
+                fname_stats = None
 
             dataset: CustomDataset = self.training_plan.dataset_factory(
                 target=self.target,
@@ -190,7 +179,7 @@ class FedbiomedWorkflow:
                 n_splits=self.n_splits,
                 train=False,
                 random_state=self.random_state,
-                fpath_stats=fpath_stats,
+                fname_stats=fname_stats,
             )
             dataset.path = dpath_dataset
             X_test, y_test = dataset.read()
@@ -219,7 +208,7 @@ class FedbiomedWorkflow:
         return Xy_test_all, n_features, sample_weight
 
     def _get_model_args(
-        self, n_features: int, i_split: int, null=False, fpath_stats=None
+        self, n_features: int, i_split: int, null=False, fname_stats=None
     ):
         model_args = {
             # fedbiomed
@@ -235,7 +224,7 @@ class FedbiomedWorkflow:
             "i_split": i_split,
             "n_splits": self.n_splits,
             "null": null,
-            "fpath_stats": str(fpath_stats) if fpath_stats is not None else None,
+            "fname_stats": str(fname_stats) if fname_stats is not None else None,
             "shuffle": True,
         }
         return model_args
@@ -251,13 +240,15 @@ class FedbiomedWorkflow:
         tags = [self.target]
         if setup == MlSetup.SILO:
             tags.append(train_dataset)
+        elif setup == MlSetup.FEDERATED:
+            tags.append(self.tag_federated)
         elif setup == MlSetup.MEGA:
-            tags.append(self.tag_mega)
+            tags.append("_".join([self.tag_mega] + sorted(self.train_datasets)))
 
         if self.standardize:
-            fpath_stats = self.get_fpath_stats(setup, i_split, train_dataset)
+            fname_stats = self.get_fname_stats(setup, i_split, train_dataset)
         else:
-            fpath_stats = None
+            fname_stats = None
 
         # Fed-BioMed experiment
         with working_directory(self.dpath_fedbiomed):
@@ -271,7 +262,7 @@ class FedbiomedWorkflow:
                     n_features=n_features,
                     i_split=i_split,
                     null=null,
-                    fpath_stats=fpath_stats,
+                    fname_stats=fname_stats,
                 ),
                 round_limit=self.n_rounds,
                 training_args={
@@ -441,6 +432,11 @@ class FedbiomedWorkflow:
     type=click.Path(path_type=Path, file_okay=False),
     envvar="DPATH_FEDBIOMED",
 )
+@click.argument(
+    "dpath_stats",
+    type=click.Path(path_type=Path, exists=True, file_okay=False),
+    envvar="DPATH_FL_STATS",
+)
 @click.option(
     "--train-dataset", "train_datasets", multiple=True, default=DEFAULT_TRAIN_DATASETS
 )
@@ -454,6 +450,7 @@ class FedbiomedWorkflow:
     multiple=True,
     default=DEFAULT_SETUPS,
 )
+@click.option("--tag-federated", type=str, default=DEFAULT_TAG_FEDERATED)
 @click.option("--tag-mega", type=str, default=DEFAULT_TAG_MEGA)
 @click.option("--n-rounds", type=click.IntRange(min=1), default=DEFAULT_N_ROUNDS)
 @click.option("--n-updates", type=click.IntRange(min=1), default=DEFAULT_N_UPDATES)

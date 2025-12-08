@@ -1,4 +1,5 @@
 import json
+from functools import cached_property
 from pathlib import Path
 from typing import List, Tuple, Type
 
@@ -80,6 +81,7 @@ class NipoppyDatasetMixin:
         df = df.drop(columns=[NipoppyDatasetMixin.TERMURL_COG_DECLINE_AVAILABILITY])
         return df
 
+    @staticmethod
     def transform_aparc(df: pd.DataFrame):
         df = df.drop(
             columns=[
@@ -90,6 +92,7 @@ class NipoppyDatasetMixin:
         )
         return df
 
+    @staticmethod
     def transform_aseg(df: pd.DataFrame) -> pd.DataFrame:
         df = df.drop(
             columns=[
@@ -181,7 +184,7 @@ class NipoppyDatasetMixin:
         train=True,
         random_state=None,
         null=False,  # TODO
-        fpath_stats=None,  # TODO
+        fname_stats=None,  # TODO
     ) -> CustomDataset:
 
         match target:
@@ -226,16 +229,23 @@ class NipoppyDatasetMixin:
 
         class NipoppyDataset(CustomDataset):
 
+            @cached_property
+            def config(self) -> dict:
+                if Path(self.path).is_file():
+                    dpath_parent = Path(self.path).parent
+                else:
+                    dpath_parent = Path(self.path)
+                return json.loads((dpath_parent / "global_config.json").read_text())[
+                    "CUSTOM"
+                ]["FL_PD"]
+
             def filter_sessions(self, df: pd.DataFrame) -> pd.DataFrame:
-                config: dict = json.loads(
-                    Path(self.path, "global_config.json").read_text()
-                )["CUSTOM"]["FL_PD"]
-                if (session_id := config.get("SINGLE_SESSION", None)) is not None:
+                if (session_id := self.config.get("SINGLE_SESSION", None)) is not None:
                     df = df.query(
                         f"{NipoppyDatasetMixin.COL_SESSION_ID} == '{session_id}'"
                     )
                 elif (
-                    mapping_file_path := config.get("MAPPING_FILE", None)
+                    mapping_file_path := self.config.get("MAPPING_FILE", None)
                 ) is not None:
                     df_mapping = pd.read_csv(
                         Path(self.path, mapping_file_path),
@@ -259,6 +269,27 @@ class NipoppyDatasetMixin:
 
                 return df
 
+            def standardize_df(
+                self, df: pd.DataFrame, cols_to_ignore=None
+            ) -> pd.DataFrame:
+                if cols_to_ignore is None:
+                    cols_to_ignore = []
+                cols_to_ignore.append("dataset")
+
+                fpath_stats = Path(self.config["STATS"], fname_stats)
+                df_stats = pd.read_csv(fpath_stats, sep="\t", index_col=0)
+                for col in df.columns:
+                    if col in cols_to_ignore:
+                        continue
+                    if col not in df_stats.columns:
+                        raise ValueError(f"{col=} not in {fpath_stats=}")
+                    mean = df_stats.at["mean", col]
+                    std = df_stats.at["std", col]
+                    if std == 0:
+                        raise ValueError(f"std is zero for {col=} in {fpath_stats=}")
+                    df[col] = (df[col] - mean) / std
+                return df
+
             def read(self):
                 self.phenotypes = phenotypes
                 self.derivatives = derivatives
@@ -268,14 +299,32 @@ class NipoppyDatasetMixin:
                 self.target = target
                 self.random_state = random_state
 
-                retriever = NipoppyDataRetriever(self.path)
-                df = retriever.get_tabular_data(
-                    phenotypes=phenotypes,
-                    derivatives=derivatives,
-                )
+                if Path(self.path).is_file():
+                    df = pd.read_csv(
+                        self.path,
+                        sep="\t",
+                        dtype={
+                            NipoppyDatasetMixin.COL_PARTICIPANT_ID: str,
+                            NipoppyDatasetMixin.COL_SESSION_ID: str,
+                        },
+                    ).set_index(
+                        [
+                            NipoppyDatasetMixin.COL_PARTICIPANT_ID,
+                            NipoppyDatasetMixin.COL_SESSION_ID,
+                        ]
+                    )
+                else:
+                    retriever = NipoppyDataRetriever(self.path)
+                    df = retriever.get_tabular_data(
+                        phenotypes=phenotypes,
+                        derivatives=derivatives,
+                    )
 
-                # filter sessions
-                df = self.filter_sessions(df)
+                    # filter sessions
+                    df = self.filter_sessions(df)
+
+                # for building mega dataset
+                self.df_before_transforms: pd.DataFrame = df.copy()
 
                 # apply transforms
                 for transform in transforms:
@@ -305,9 +354,19 @@ class NipoppyDatasetMixin:
                     idx = idx_test
                 df = df.iloc[idx]
 
+                if fname_stats is not None:
+                    df = self.standardize_df(df, cols_to_ignore=[target])
+
                 self.df: pd.DataFrame = df.copy()
                 self.y = self.df[[self.target]]
                 self.X = self.df.drop(labels=[self.target], axis="columns")
+
+                if null:
+                    rng = np.random.default_rng()
+                    idx = np.arange(len(self.y))
+                    rng.shuffle(idx)
+                    self.y = self.y.iloc[idx]
+
                 return self.X, self.y
 
             def __len__(self) -> int:
@@ -321,6 +380,7 @@ class NipoppyDatasetMixin:
     def init_dependencies(self: BaseTrainingPlan) -> List[str]:
         deps = [
             "import json",
+            "from functools import cached_property",
             "from typing import List, Tuple, Type",
             "import numpy as np",
             "import pandas as pd",
@@ -345,7 +405,7 @@ class NipoppyDatasetMixin:
             n_splits=model_args.get("n_splits", 10),
             random_state=model_args.get("random_state", None),
             null=model_args.get("null", False),
-            fpath_stats=model_args.get("fpath_stats", None),
+            fname_stats=model_args.get("fname_stats", None),
         )
         # raise RuntimeError(f"{type(dataset)=}")
         return DataManager(dataset=dataset, shuffle=model_args.get("shuffle", False))
