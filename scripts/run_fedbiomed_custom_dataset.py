@@ -24,8 +24,8 @@ DEFAULT_STANDARDIZE = True
 
 DEFAULT_TAG_FEDERATED = "federated"
 DEFAULT_TAG_MEGA = "mega"
-DEFAULT_TRAIN_DATASETS = ("calgary", "pad", "ppmi")  # fedbiomed tags
-DEFAULT_TEST_DATASETS = ("calgary", "pad", "ppmi")  # local datasets
+DEFAULT_TRAIN_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")  # fedbiomed tags
+DEFAULT_TEST_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")  # local datasets
 
 DEFAULT_N_ROUNDS = 20
 DEFAULT_N_UPDATES = 20
@@ -157,7 +157,7 @@ class FedbiomedWorkflow:
         fname_stats = f"{dataset_str}-{self.target}-{self.n_splits}splits-rng{self.random_state}-{i_split}.tsv"
         return fname_stats
 
-    def get_test_data(self, i_split: int, setup: MlSetup):
+    def get_test_data(self, i_split: int, setup: MlSetup, train_dataset: str):
         Xy_test_all = {}
 
         for dataset_name in self.test_datasets:
@@ -169,7 +169,7 @@ class FedbiomedWorkflow:
                 raise KnownError(f"Local dataset not found: {dpath_dataset}")
 
             if self.standardize:
-                fname_stats = self.get_fname_stats(setup, i_split, dataset_name)
+                fname_stats = self.get_fname_stats(setup, i_split, train_dataset)
             else:
                 fname_stats = None
 
@@ -292,7 +292,7 @@ class FedbiomedWorkflow:
         train_dataset: str,
     ) -> Generator[dict, None, None]:
         Xy_test_all, n_features, sample_weight = self.get_test_data(
-            i_split=i_split, setup=setup
+            i_split=i_split, setup=setup, train_dataset=train_dataset
         )
 
         model = self.train(
@@ -349,8 +349,8 @@ class FedbiomedWorkflow:
     def get_results_all_setups(
         self, n_iter: int, null: bool = False
     ) -> Generator[dict, None, None]:
-        for setup in self.setups:
-            for i_split in range(self.n_splits):
+        for i_split in range(self.n_splits):
+            for setup in self.setups:
                 for i_iter in range(n_iter):
                     print(
                         f"Running:\tsetup={setup.value}\t{i_split=}\t{i_iter=}\t{null=}"
@@ -416,7 +416,6 @@ class FedbiomedWorkflow:
 
 
 @click.command(context_settings=CLICK_CONTEXT_SETTINGS)
-@click.argument("target", type=click.Choice(TARGET_PROBLEM_MAP.keys()))
 @click.argument(
     "dpath_data",
     type=click.Path(path_type=Path, exists=True, file_okay=False),
@@ -437,6 +436,7 @@ class FedbiomedWorkflow:
     type=click.Path(path_type=Path, exists=True, file_okay=False),
     envvar="DPATH_FL_STATS",
 )
+@click.option("--target", type=click.Choice(TARGET_PROBLEM_MAP.keys()))
 @click.option(
     "--train-dataset", "train_datasets", multiple=True, default=DEFAULT_TRAIN_DATASETS
 )
