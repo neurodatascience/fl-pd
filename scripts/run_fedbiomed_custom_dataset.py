@@ -25,10 +25,17 @@ DEFAULT_STANDARDIZE = True
 DEFAULT_TAG_FEDERATED = "federated"
 DEFAULT_TAG_MEGA = "mega"
 DEFAULT_TRAIN_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")  # fedbiomed tags
-DEFAULT_TEST_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")  # local datasets
+DEFAULT_TEST_DATASETS = (
+    "adni",
+    "calgary",
+    "pad",
+    "ppmi",
+    "qpn",
+    # "tums",
+)  # local datasets
 
 DEFAULT_N_ROUNDS = 20
-DEFAULT_N_UPDATES = 20
+DEFAULT_N_UPDATES = 50
 DEFAULT_BATCH_SIZE = 50
 DEFAULT_SAVE_MODEL = False
 
@@ -135,7 +142,9 @@ class FedbiomedWorkflow:
     def settings(self) -> dict:
         settings = self.__dict__.copy()
         for key, value in settings.items():
-            if isinstance(value, (tuple, bool, int, float)):
+            if isinstance(value, (tuple, bool, int, float)) or (
+                isinstance(value, list) and all(isinstance(v, str) for v in value)
+            ):
                 continue
             if isinstance(value, Path):
                 value = value.resolve()

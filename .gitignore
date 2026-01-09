@@ -21,3 +21,6 @@ trained_model
 # figures
 *.svg
 *.png
+
+# testing
+notebooks/**/cog_decline*.tsv

@@ -1,4 +1,5 @@
 import json
+import warnings
 from functools import cached_property
 from pathlib import Path
 from typing import List, Tuple, Type
@@ -43,12 +44,13 @@ class NipoppyDatasetMixin:
     TERMURL_UNAVAILABLE = "nb:unavailable"
     TERMURL_MALE = "snomed:248153007"
     TERMURL_FEMALE = "snomed:248152002"
+    TERMURL_HEALTHY_CONTROL = "ncit:C94342"
 
     # for derivatives specs
     FS_NAME = "freesurfer"
     FS_VERSION = "7.3.2"
     FS_STATS_NAME = "fs_stats"
-    FS_STATS_VERSION = "0.2.*"
+    FS_STATS_VERSION = "0.2.1"
     SUFFIX_APARC = "-aparc.DKTatlas-thickness.tsv"
     SUFFIX_ASEG = "-aseg-volume.tsv"
 
@@ -79,6 +81,30 @@ class NipoppyDatasetMixin:
             == NipoppyDatasetMixin.TERMURL_AVAILABLE
         ]
         df = df.drop(columns=[NipoppyDatasetMixin.TERMURL_COG_DECLINE_AVAILABILITY])
+        return df
+
+    @staticmethod
+    def transform_select_hc(df: pd.DataFrame) -> pd.DataFrame:
+        if NipoppyDatasetMixin.TERMURL_DIAGNOSIS in df.columns:
+            df = df.loc[
+                df[NipoppyDatasetMixin.TERMURL_DIAGNOSIS]
+                == NipoppyDatasetMixin.TERMURL_HEALTHY_CONTROL
+            ]
+            df = df.drop(columns=[NipoppyDatasetMixin.TERMURL_DIAGNOSIS])
+        else:
+            warnings.warn("TERMURL_DIAGNOSIS column not found in DataFrame")
+        return df
+
+    @staticmethod
+    def transform_select_patients(df: pd.DataFrame) -> pd.DataFrame:
+        if NipoppyDatasetMixin.TERMURL_DIAGNOSIS in df.columns:
+            df = df.loc[
+                df[NipoppyDatasetMixin.TERMURL_DIAGNOSIS]
+                != NipoppyDatasetMixin.TERMURL_HEALTHY_CONTROL
+            ]
+            df = df.drop(columns=[NipoppyDatasetMixin.TERMURL_DIAGNOSIS])
+        else:
+            warnings.warn("TERMURL_DIAGNOSIS column not found in DataFrame")
         return df
 
     @staticmethod
@@ -192,22 +218,34 @@ class NipoppyDatasetMixin:
                 phenotypes = [
                     cls.TERMURL_AGE,
                     cls.TERMURL_SEX,
+                    cls.TERMURL_DIAGNOSIS,
                     cls.TERMURL_COG_DECLINE,
                     cls.TERMURL_COG_DECLINE_AVAILABILITY,
                 ]
-                derivatives = [cls.get_aparc_spec()]
+                derivatives = [
+                    cls.get_aparc_spec(),
+                ]
                 transforms = [
                     cls.transform_aparc,
+                    cls.transform_select_patients,
                     cls.transform_cog_decline,
                     cls.transform_dropna,
                     cls.transform_skrub,
                 ]
             case cls.TERMURL_AGE:
-                phenotypes = [cls.TERMURL_AGE, cls.TERMURL_SEX]
-                derivatives = [cls.get_aparc_spec(), cls.get_aseg_spec()]
+                phenotypes = [
+                    cls.TERMURL_AGE,
+                    cls.TERMURL_SEX,
+                    cls.TERMURL_DIAGNOSIS,
+                ]
+                derivatives = [
+                    # cls.get_aparc_spec(),
+                    cls.get_aseg_spec(),
+                ]
                 transforms = [
-                    cls.transform_aparc,
+                    # cls.transform_aparc,
                     cls.transform_aseg,
+                    cls.transform_select_hc,
                     cls.transform_dropna,
                     cls.transform_skrub,
                 ]
@@ -217,7 +255,10 @@ class NipoppyDatasetMixin:
                     cls.TERMURL_SEX,
                     cls.TERMURL_DIAGNOSIS,
                 ]
-                derivatives = [cls.get_aparc_spec(), cls.get_aseg_spec()]
+                derivatives = [
+                    cls.get_aparc_spec(),
+                    cls.get_aseg_spec(),
+                ]
                 transforms = [
                     cls.transform_aparc,
                     cls.transform_aseg,
@@ -315,10 +356,23 @@ class NipoppyDatasetMixin:
                     )
                 else:
                     retriever = NipoppyDataRetriever(self.path)
-                    df = retriever.get_tabular_data(
-                        phenotypes=phenotypes,
-                        derivatives=derivatives,
-                    )
+                    try:
+                        df = retriever.get_tabular_data(
+                            phenotypes=phenotypes,
+                            derivatives=derivatives,
+                        )
+                    except KeyError as e:
+                        warnings.warn(
+                            f"Error retrieving data from {self.path}: {e}. Trying again without diagnosis column."
+                        )
+                        df = retriever.get_tabular_data(
+                            phenotypes=[
+                                phenotype
+                                for phenotype in phenotypes
+                                if phenotype != NipoppyDatasetMixin.TERMURL_DIAGNOSIS
+                            ],
+                            derivatives=derivatives,
+                        )
 
                     # filter sessions
                     df = self.filter_sessions(df)
@@ -333,6 +387,9 @@ class NipoppyDatasetMixin:
                         raise TypeError(
                             "Transform functions must return a pandas DataFrame."
                         )
+
+                # after transforms but before splits
+                self.df_after_transforms: pd.DataFrame = df.copy()
 
                 # stratification variable
                 if target == NipoppyDatasetMixin.TERMURL_AGE:
@@ -380,6 +437,7 @@ class NipoppyDatasetMixin:
     def init_dependencies(self: BaseTrainingPlan) -> List[str]:
         deps = [
             "import json",
+            "import warnings",
             "from functools import cached_property",
             "from typing import List, Tuple, Type",
             "import numpy as np",
