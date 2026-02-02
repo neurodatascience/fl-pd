@@ -4,7 +4,7 @@ import json
 import sys
 import pickle
 from pathlib import Path
-from typing import Generator, Iterable, Optional, Type
+from typing import Generator, Iterable, Optional, Tuple, Type
 
 import click
 import pandas as pd
@@ -64,7 +64,9 @@ class FedbiomedWorkflow:
         test_datasets: Iterable[str] = DEFAULT_TEST_DATASETS,
         setups: Iterable[MlSetup] = DEFAULT_SETUPS,
         standardize: bool = DEFAULT_STANDARDIZE,
+        i_split_range: Optional[Tuple[int, int]] = None,
         n_splits: int = DEFAULT_N_SPLITS,
+        i_split_range_null: Optional[Tuple[int, int]] = None,
         n_iter_null: int = DEFAULT_N_ITER_NULL,
         random_state: Optional[int] = None,
         save_model: bool = False,
@@ -77,6 +79,11 @@ class FedbiomedWorkflow:
         tag_mega: str = DEFAULT_TAG_MEGA,
     ):
         super().__init__()
+
+        if i_split_range is None:
+            i_split_range = (0, n_splits)
+        if i_split_range_null is None:
+            i_split_range_null = (0, n_splits)
 
         if sloppy:
             n_rounds = 1
@@ -91,7 +98,9 @@ class FedbiomedWorkflow:
         self.test_datasets = test_datasets
         self.setups = setups
         self.standardize = standardize
+        self.i_split_range = i_split_range
         self.n_splits = n_splits
+        self.i_split_range_null = i_split_range_null
         self.n_iter_null = n_iter_null
         self.random_state = random_state
         self.save_model = save_model
@@ -114,17 +123,27 @@ class FedbiomedWorkflow:
             suffix_components.append("standardize")
         else:
             suffix_components.append("no_standardize")
-        suffix_components.extend(
-            [
-                f"{self.n_splits}_splits",
-                f"{self.n_iter_null}_null",
-                f"{self.random_state}",
-            ]
-        )
-        suffix = "-".join(suffix_components)
+        suffix_components.append(f"{self.n_splits}_splits")
+
+        if self.i_split_range[1] > self.i_split_range[0]:
+            suffix_components.append(
+                f"{self.i_split_range[0]}_{self.i_split_range[1]}_nonnull"
+            )
+
+        if (
+            self.i_split_range_null[1] > self.i_split_range_null[0]
+            and self.n_iter_null > 0
+        ):
+            suffix_components.append(
+                f"{self.i_split_range_null[0]}_{self.i_split_range_null[1]}_{self.n_iter_null}_null"
+            )
+
+        suffix_components.append(f"{self.random_state}")
 
         if self.sloppy:
-            suffix += "-sloppy"
+            suffix_components.append("sloppy")
+
+        suffix = "-".join(suffix_components)
 
         framework_tags = "fbm"
 
@@ -359,7 +378,12 @@ class FedbiomedWorkflow:
     def get_results_all_setups(
         self, n_iter: int, null: bool = False
     ) -> Generator[dict, None, None]:
-        for i_split in range(self.n_splits):
+        if null:
+            i_split_range = self.i_split_range_null
+        else:
+            i_split_range = self.i_split_range
+
+        for i_split in range(*i_split_range):
             for setup in self.setups:
                 for i_iter in range(n_iter):
                     print(
@@ -470,9 +494,25 @@ class FedbiomedWorkflow:
     default=DEFAULT_STANDARDIZE,
     help="Standardize train and test data based on train data mean/std",
 )
+@click.option(
+    "--split-range",
+    "i_split_range",
+    nargs=2,
+    type=int,
+    default=None,
+    help="Range of splits to run for non-null models (default: all splits). Provide as two integers: start (inclusive) and end (exclusive).",
+)
 @click.option("--n-splits", type=click.IntRange(min=1), default=DEFAULT_N_SPLITS)
 @click.option(
-    "--null",
+    "--split-range-null",
+    "i_split_range_null",
+    nargs=2,
+    type=int,
+    default=None,
+    help="Range of splits to run for null models (default: all splits). Provide as two integers: start (inclusive) and end (exclusive).",
+)
+@click.option(
+    "--n-null",
     "n_iter_null",
     type=click.IntRange(min=0),
     default=DEFAULT_N_ITER_NULL,

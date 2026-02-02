@@ -54,8 +54,10 @@ fedbiomed node -p $DPATH_FEDBIOMED/node-mega dataset add
 ./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'nb:Age'
 
 # run_fedbiomed_custom_dataset.py
-./scripts/run_fedbiomed_custom_dataset.py --null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'fl:cognitive_decline_status'
-./scripts/run_fedbiomed_custom_dataset.py --null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'nb:Age'
+# use --split-range START END and --split-range-null START END to control which splits to run
+# e.g., --split-range 0 5 to run splits 0 to 4 (inclusive) 
+./scripts/run_fedbiomed_custom_dataset.py --n-null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'fl:cognitive_decline_status'
+./scripts/run_fedbiomed_custom_dataset.py --n-null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'nb:Age'
 
 # # ===== OLD =====
 
