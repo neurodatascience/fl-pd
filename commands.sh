@@ -27,7 +27,10 @@ fedbiomed component create -p $DPATH_FEDBIOMED/node-<DATASET> -c NODE -n <DATASE
 # add dataset to node (only needs to be done once)
 # datatype: 6 (custom)
 # tags: <DATASET>,<TARGET1>,<TARGET2>,...,federated
+#   eg: ppmi,federated,nb:Age,nb:Diagnosis,fl:cognitive_decline_status
+#       adni,federated,nb:Age,nb:Diagnosis,fl:cognitive_decline_status
 # path to dataset is Nipoppy root path
+# NOTE: <DATASET> is lowercase dataset name (e.g., adni, ppmi, qpn, pad, calgary)
 fedbiomed node -p $DPATH_FEDBIOMED/node-<DATASET> dataset add
 
 # start node if needed
@@ -47,8 +50,8 @@ fedbiomed component create -p $DPATH_FEDBIOMED/node-mega -c NODE -n mega
 fedbiomed node -p $DPATH_FEDBIOMED/node-mega dataset add
 
 # get statistics TSV files
-./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --target 'fl:cognitive_decline_status'
-./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --target 'nb:Age'
+./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'fl:cognitive_decline_status'
+./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'nb:Age'
 
 # run_fedbiomed_custom_dataset.py
 ./scripts/run_fedbiomed_custom_dataset.py --null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'fl:cognitive_decline_status'

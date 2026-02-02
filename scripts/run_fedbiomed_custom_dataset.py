@@ -23,8 +23,8 @@ DEFAULT_SETUPS = tuple([setup for setup in MlSetup])
 DEFAULT_STANDARDIZE = True
 
 DEFAULT_TAG_FEDERATED = "federated"
-DEFAULT_TAG_MEGA = "mega"
-DEFAULT_TRAIN_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")  # fedbiomed tags
+DEFAULT_TAG_MEGA = "mega_adni_calgary_pad_ppmi_qpn"
+DEFAULT_TRAIN_DATASETS = ("adni", "calgary", "pad", "ppmi", "qpn")  # silo/federated
 DEFAULT_TEST_DATASETS = (
     "adni",
     "calgary",
@@ -159,9 +159,10 @@ class FedbiomedWorkflow:
     def get_fname_stats(self, setup: MlSetup, i_split: int, train_dataset: str) -> Path:
         if setup == MlSetup.SILO:
             dataset_str = train_dataset
+        elif setup == MlSetup.MEGA:
+            dataset_str = self.tag_mega
         else:
-            # TODO maybe different for federated if not all datasets are known
-            dataset_str = "_".join([self.tag_mega] + sorted(self.train_datasets))
+            dataset_str = "_".join([self.tag_federated] + sorted(self.train_datasets))
 
         fname_stats = f"{dataset_str}-{self.target}-{self.n_splits}splits-rng{self.random_state}-{i_split}.tsv"
         return fname_stats
@@ -252,7 +253,7 @@ class FedbiomedWorkflow:
         elif setup == MlSetup.FEDERATED:
             tags.append(self.tag_federated)
         elif setup == MlSetup.MEGA:
-            tags.append("_".join([self.tag_mega] + sorted(self.train_datasets)))
+            tags.append(self.tag_mega)
 
         if self.standardize:
             fname_stats = self.get_fname_stats(setup, i_split, train_dataset)

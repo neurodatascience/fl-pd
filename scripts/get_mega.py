@@ -27,22 +27,31 @@ from fl_pd.custom_dataset import training_plan_factory
     required=True,
     envvar="DPATH_FL_DATA_LATEST_MEGA",
 )
+@click.option("--random-state", type=int, envvar="RANDOM_SEED")
+@click.option("--n-splits", type=int, default=10)
 def get_mega(
     target,
     dataset_tags_and_paths: Tuple[str, Path],
     dpath_out: Path,
+    random_state: int = 3791,
+    n_splits: int = 10,
 ):
     dfs = []
     for _, dataset_path in dataset_tags_and_paths:
-        dataset = training_plan_factory(target).dataset_factory(
-            target=target,
-            i_split=0,  # not used
-        )
-        dataset.path = str(dataset_path)
-        dataset.read()
+        for i_split in range(n_splits):
+            dataset = training_plan_factory(target).dataset_factory(
+                target=target,
+                i_split=i_split,
+                random_state=random_state,
+            )
+            dataset.path = str(dataset_path)
+            dataset.read()
 
-        # output of data retriver, filtered by session, before any other transforms
-        dfs.append(dataset.df_before_transforms)
+            # output of data retriever, filtered by session, before any other transforms
+            df = dataset.df_before_transforms.loc[dataset.idx]
+            df.loc[:, "i_split"] = i_split
+
+            dfs.append(df)
 
     df_mega = pd.concat(dfs, axis="index")
 

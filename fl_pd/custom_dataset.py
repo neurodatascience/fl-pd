@@ -84,6 +84,17 @@ class NipoppyDatasetMixin:
         return df
 
     @staticmethod
+    def transform_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
+        # binarize diagnosis: healthy control (0) vs non-healthy-controls (1)
+        # NAs remain NAs
+        df[NipoppyDatasetMixin.TERMURL_DIAGNOSIS] = df[
+            NipoppyDatasetMixin.TERMURL_DIAGNOSIS
+        ].map(
+            lambda x: 0 if x == NipoppyDatasetMixin.TERMURL_HEALTHY_CONTROL else 1,
+        )
+        return df
+
+    @staticmethod
     def transform_select_hc(df: pd.DataFrame) -> pd.DataFrame:
         if NipoppyDatasetMixin.TERMURL_DIAGNOSIS in df.columns:
             df = df.loc[
@@ -262,6 +273,7 @@ class NipoppyDatasetMixin:
                 transforms = [
                     cls.transform_aparc,
                     cls.transform_aseg,
+                    cls.transform_diagnosis,
                     cls.transform_dropna,
                     cls.transform_skrub,
                 ]
@@ -340,6 +352,8 @@ class NipoppyDatasetMixin:
                 self.target = target
                 self.random_state = random_state
 
+                need_cv_split = True
+
                 if Path(self.path).is_file():
                     df = pd.read_csv(
                         self.path,
@@ -354,6 +368,9 @@ class NipoppyDatasetMixin:
                             NipoppyDatasetMixin.COL_SESSION_ID,
                         ]
                     )
+                    df = df.query("i_split == @i_split")
+                    df = df.drop(columns=["i_split"])
+                    need_cv_split = False
                 else:
                     retriever = NipoppyDataRetriever(self.path)
                     try:
@@ -391,25 +408,27 @@ class NipoppyDatasetMixin:
                 # after transforms but before splits
                 self.df_after_transforms: pd.DataFrame = df.copy()
 
-                # stratification variable
-                if target == NipoppyDatasetMixin.TERMURL_AGE:
-                    bins = np.arange(0, 100, 5)
-                    y = pd.cut(df[target], bins=bins).astype(str)
-                else:
-                    y = df[target]
+                if need_cv_split:
+                    # stratification variable
+                    if target == NipoppyDatasetMixin.TERMURL_AGE:
+                        bins = np.arange(0, 100, 5)
+                        y = pd.cut(df[target], bins=bins).astype(str)
+                    else:
+                        y = df[target]
 
-                # get CV fold
-                cv = StratifiedKFold(
-                    n_splits=n_splits, shuffle=True, random_state=random_state
-                )
-                splits = cv.split(np.arange(len(df)), y=y)
-                for _ in range(i_split + 1):
-                    idx_train, idx_test = next(splits)
-                if train:
-                    idx = idx_train
-                else:
-                    idx = idx_test
-                df = df.iloc[idx]
+                    # get CV fold
+                    cv = StratifiedKFold(
+                        n_splits=n_splits, shuffle=True, random_state=random_state
+                    )
+                    splits = cv.split(np.arange(len(df)), y=y)
+                    for _ in range(i_split + 1):
+                        idx_train, idx_test = next(splits)
+                    if train:
+                        idx = df.index[idx_train]
+                    else:
+                        idx = df.index[idx_test]
+                    self.idx = idx
+                    df = df.loc[idx]
 
                 if fname_stats is not None:
                     df = self.standardize_df(df, cols_to_ignore=[target])
