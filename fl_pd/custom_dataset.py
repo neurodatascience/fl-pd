@@ -90,7 +90,11 @@ class NipoppyDatasetMixin:
         df[NipoppyDatasetMixin.TERMURL_DIAGNOSIS] = df[
             NipoppyDatasetMixin.TERMURL_DIAGNOSIS
         ].map(
-            lambda x: 0 if x == NipoppyDatasetMixin.TERMURL_HEALTHY_CONTROL else 1,
+            lambda x: (
+                0
+                if x == NipoppyDatasetMixin.TERMURL_HEALTHY_CONTROL
+                else 1 if not pd.isna(x) else x
+            ),
         )
         return df
 
@@ -368,8 +372,8 @@ class NipoppyDatasetMixin:
                             NipoppyDatasetMixin.COL_SESSION_ID,
                         ]
                     )
-                    df = df.query("i_split == @i_split")
-                    df = df.drop(columns=["i_split"])
+                    df = df.query("i_split == @i_split and train == @train")
+                    df = df.drop(columns=["i_split", "train"])
                     need_cv_split = False
                 else:
                     retriever = NipoppyDataRetriever(self.path)
@@ -475,7 +479,6 @@ class NipoppyDatasetMixin:
 
     def training_data(self: BaseTrainingPlan) -> DataManager:
         model_args = self.model_args()
-        # raise RuntimeError("HERE")
         dataset = self.dataset_factory(
             target=model_args["target"],
             i_split=model_args["i_split"],
@@ -484,7 +487,6 @@ class NipoppyDatasetMixin:
             null=model_args.get("null", False),
             fname_stats=model_args.get("fname_stats", None),
         )
-        # raise RuntimeError(f"{type(dataset)=}")
         return DataManager(dataset=dataset, shuffle=model_args.get("shuffle", False))
 
 

@@ -39,19 +39,22 @@ def get_mega(
     dfs = []
     for _, dataset_path in dataset_tags_and_paths:
         for i_split in range(n_splits):
-            dataset = training_plan_factory(target).dataset_factory(
-                target=target,
-                i_split=i_split,
-                random_state=random_state,
-            )
-            dataset.path = str(dataset_path)
-            dataset.read()
+            for train in (True, False):
+                dataset = training_plan_factory(target).dataset_factory(
+                    target=target,
+                    i_split=i_split,
+                    train=train,
+                    random_state=random_state,
+                )
+                dataset.path = str(dataset_path)
+                dataset.read()
 
-            # output of data retriever, filtered by session, before any other transforms
-            df = dataset.df_before_transforms.loc[dataset.idx]
-            df.loc[:, "i_split"] = i_split
+                # output of data retriever, filtered by session, before any other transforms
+                df = dataset.df_before_transforms.loc[dataset.idx]
+                df.loc[:, "i_split"] = i_split
+                df.loc[:, "train"] = train
 
-            dfs.append(df)
+                dfs.append(df)
 
     df_mega = pd.concat(dfs, axis="index")
 
