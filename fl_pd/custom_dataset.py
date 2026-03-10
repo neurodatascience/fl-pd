@@ -417,11 +417,19 @@ class NipoppyDatasetMixin:
                     if target == NipoppyDatasetMixin.TERMURL_AGE:
                         bin_size = self.config.get("AGE_BIN_SIZE", 5)
                         bin_min = df[target].min() - 1
-                        bin_max = bin_size * (((df[target].max() - bin_min) // bin_size) + 1) + bin_min + 1
+                        bin_max = (
+                            bin_size * (((df[target].max() - bin_min) // bin_size) + 1)
+                            + bin_min
+                            + 1
+                        )
                         bins = np.arange(bin_min, bin_max, bin_size)
-                        y = pd.cut(df[target], bins=bins).astype(str)
+                        y = pd.cut(df[target], bins=bins)
+                        # print(y.value_counts(dropna=False))
                         if y.isna().any():
-                            raise RuntimeError("Some samples have NaN values in the stratification variable after binning.")
+                            raise RuntimeError(
+                                "Some samples have NaN values in the stratification variable after binning."
+                            )
+                        y = y.astype(str)
                     else:
                         y = df[target]
 
