@@ -415,8 +415,13 @@ class NipoppyDatasetMixin:
                 if need_cv_split:
                     # stratification variable
                     if target == NipoppyDatasetMixin.TERMURL_AGE:
-                        bins = np.arange(0, 100, 15)
+                        bin_size = self.config.get("AGE_BIN_SIZE", 5)
+                        bin_min = df[target].min() - 1
+                        bin_max = bin_size * (((df[target].max() - bin_min) // bin_size) + 1) + bin_min + 1
+                        bins = np.arange(bin_min, bin_max, bin_size)
                         y = pd.cut(df[target], bins=bins).astype(str)
+                        if y.isna().any():
+                            raise RuntimeError("Some samples have NaN values in the stratification variable after binning.")
                     else:
                         y = df[target]
 
