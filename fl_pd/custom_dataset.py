@@ -415,7 +415,7 @@ class NipoppyDatasetMixin:
                 if need_cv_split:
                     # stratification variable
                     if target == NipoppyDatasetMixin.TERMURL_AGE:
-                        bins = np.arange(0, 100, 5)
+                        bins = np.arange(0, 100, 15)
                         y = pd.cut(df[target], bins=bins).astype(str)
                     else:
                         y = df[target]

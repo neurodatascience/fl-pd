@@ -59,6 +59,9 @@ fedbiomed node -p $DPATH_FEDBIOMED/node-mega start
 ./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'fl:cognitive_decline_status'
 ./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'nb:Age'
 ./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated ppmi --federated qpn --target 'nb:Diagnosis'
+# cogtips (to be run on other node)
+./scripts/get_statistics_custom_dataset.py --dataset cogtips $DPATH_FL_DATA_LATEST/vumc2 --output $DPATH_FL_STATS --n-splits 10 --random-state $RANDOM_SEED --target 'nb:Age'
+./scripts/get_statistics_custom_dataset.py --dataset cogtips $DPATH_FL_DATA_LATEST/vumc2 --output $DPATH_FL_STATS --n-splits 10 --random-state $RANDOM_SEED --target 'nb:Diagnosis'
 # add cogtips to federated case
 ./scripts/get_statistics_custom_dataset.py --federated adni --federated calgary --federated cogtips --federated ppmi --federated qpn --target 'nb:Diagnosis'
 
