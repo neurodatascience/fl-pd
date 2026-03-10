@@ -33,12 +33,12 @@ fedbiomed component create -p $DPATH_FEDBIOMED/node-<DATASET> -c NODE -n <DATASE
 # NOTE: <DATASET> is lowercase dataset name (e.g., adni, ppmi, qpn, pad, calgary)
 fedbiomed node -p $DPATH_FEDBIOMED/node-<DATASET> dataset add
 
-# start node if needed
 fedbiomed node -p $DPATH_FEDBIOMED/node-<DATASET> start
 
 # build TSV for mega-analysis node
 ./scripts/get_mega.py --output $DPATH_FL_DATA_LATEST_MEGA --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --target 'fl:cognitive_decline_status' 
 ./scripts/get_mega.py --output $DPATH_FL_DATA_LATEST_MEGA --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --target 'nb:Age' 
+./scripts/get_mega.py --output $DPATH_FL_DATA_LATEST_MEGA --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --target 'nb:Diagnosis' 
 
 # create mega node if needed
 fedbiomed component create -p $DPATH_FEDBIOMED/node-mega -c NODE -n mega
@@ -46,18 +46,32 @@ fedbiomed component create -p $DPATH_FEDBIOMED/node-mega -c NODE -n mega
 # add TSV data to node (needs to be done multiple times)
 # datatype: 6 (custom)
 # tags: mega_<DATASET1>_<DATASET2>_<...>,<TARGET>
+#   eg: mega_adni_calgary_pad_ppmi_qpn,fl:cognitive_decline_status
+#       mega_adni_calgary_pad_ppmi_qpn,nb:Age
+#       mega_adni_calgary_ppmi_qpn,nb:Diagnosis
 # path to dataset is TSV file path
 fedbiomed node -p $DPATH_FEDBIOMED/node-mega dataset add
+
+# start node if needed
+fedbiomed node -p $DPATH_FEDBIOMED/node-mega start
 
 # get statistics TSV files
 ./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'fl:cognitive_decline_status'
 ./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary --dataset pad $DPATH_FL_DATA_LATEST/pad  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated pad --federated ppmi --federated qpn --target 'nb:Age'
+./scripts/get_statistics_custom_dataset.py --dataset adni $DPATH_FL_DATA_LATEST/adni --dataset calgary $DPATH_FL_DATA_LATEST/calgary  --dataset ppmi $DPATH_FL_DATA_LATEST/ppmi --dataset qpn $DPATH_FL_DATA_LATEST/qpn --mega $DPATH_FL_DATA_LATEST_MEGA --federated adni --federated calgary --federated ppmi --federated qpn --target 'nb:Diagnosis'
+# add cogtips to federated case
+./scripts/get_statistics_custom_dataset.py --federated adni --federated calgary --federated cogtips --federated ppmi --federated qpn --target 'nb:Diagnosis'
 
 # run_fedbiomed_custom_dataset.py
 # use --split-range START END and --split-range-null START END to control which splits to run
 # e.g., --split-range 0 5 to run splits 0 to 4 (inclusive) 
 ./scripts/run_fedbiomed_custom_dataset.py --n-null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'fl:cognitive_decline_status'
 ./scripts/run_fedbiomed_custom_dataset.py --n-null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'nb:Age'
+./scripts/run_fedbiomed_custom_dataset.py --n-null 10 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'nb:Diagnosis' --tag-mega 'mega_adni_calgary_ppmi_qpn' --train-dataset adni --train-dataset calgary --train-dataset ppmi --train-dataset qpn --test-dataset adni --test-dataset calgary --test-dataset ppmi --test-dataset qpn
+
+# troubleshooting diagnosis
+./scripts/run_fedbiomed_custom_dataset.py --n-null 0 --split-range 0 1 $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'nb:Diagnosis' --tag-mega 'mega_adni_calgary_ppmi_qpn' --train-dataset adni --train-dataset calgary --train-dataset ppmi --train-dataset qpn --test-dataset adni --test-dataset calgary --test-dataset ppmi --test-dataset qpn --n-updates 100 
+./scripts/run_fedbiomed_custom_dataset.py --n-null 0 --split-range 0 1 --setup mega $DPATH_FL_DATA $DPATH_FL_RESULTS $DPATH_FEDBIOMED $DPATH_FL_STATS --target 'nb:Diagnosis' --tag-mega 'mega_adni_calgary_ppmi_qpn' --train-dataset adni --train-dataset calgary --train-dataset ppmi --train-dataset qpn --test-dataset adni --test-dataset calgary --test-dataset ppmi --test-dataset qpn
 
 # # ===== OLD =====
 
