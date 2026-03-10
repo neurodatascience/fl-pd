@@ -384,8 +384,8 @@ class FedbiomedWorkflow:
             i_split_range = self.i_split_range
 
         for i_split in range(*i_split_range):
-            for setup in self.setups:
-                for i_iter in range(n_iter):
+            for i_iter in range(n_iter):
+                for setup in self.setups:
                     print(
                         f"Running:\tsetup={setup.value}\t{i_split=}\t{i_iter=}\t{null=}"
                     )
