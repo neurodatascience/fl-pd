@@ -3,5 +3,6 @@
     "tsv_file": "[[PHENO_FILE]]",
     "json_file": "[[DATA_DICTIONARY_FILE]]",
     "out_file": "[[NIPOPPY_FPATH_HARMONIZED]]",
+    "algorithm_id": 5,
     "work_dir": "[[NIPOPPY_DPATH_PIPELINE_OUTPUT]]"
 }
