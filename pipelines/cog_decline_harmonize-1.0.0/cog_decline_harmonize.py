@@ -26,6 +26,10 @@ LABEL_COG_DECLINE_AVAILABILITY = "Cognitive decline availability"
 COL_COG_DECLINE_STATUS = "cog_decline_status"
 COL_COG_DECLINE_AVAILABILITY = "cog_decline_availability"
 
+TIME_THRESHOLD = 0.4
+
+COL_RATE = "rate"  # internal
+
 
 def _get_parser():
     parser = argparse.ArgumentParser(
@@ -76,7 +80,7 @@ def _get_col_score(annotations: dict) -> str:
         except ValueError:
             continue
     if col_score is None:
-        raise ValueError(f"None of the score TermURLs found in annotations")
+        raise ValueError("None of the score TermURLs found in annotations")
     return col_score
 
 
@@ -88,8 +92,41 @@ def _is_cog_decline(
     col_score: str,
 ) -> bool:
 
-    def _is_cog_decline1(df: pd.DataFrame) -> bool:
-        col_rate = "rate"  # internal
+    def collapse_close_timepoints(
+        df_diff: pd.DataFrame, time_threshold=TIME_THRESHOLD
+    ) -> pd.DataFrame:
+        if df_diff.index.name != col_participant_id:
+            df_diff = df_diff.set_index(col_participant_id)
+
+        df_diff = df_diff.reset_index().copy()
+        df_close = df_diff.query(f"{col_age} < {time_threshold}")
+
+        if df_close.empty:
+            return df_diff
+
+        idx_to_remove = df_close.index[0]
+        df_diff.loc[idx_to_remove - 1, col_age] += (
+            df_diff.loc[idx_to_remove, col_age] / 2
+        )
+        df_diff.loc[idx_to_remove - 1, col_score] += (
+            df_diff.loc[idx_to_remove, col_score] / 2
+        )
+
+        try:
+            df_diff.loc[idx_to_remove + 1, col_age] += (
+                df_diff.loc[idx_to_remove, col_age] / 2
+            )
+            df_diff.loc[idx_to_remove + 1, col_score] += (
+                df_diff.loc[idx_to_remove, col_score] / 2
+            )
+        except KeyError:
+            pass
+
+        return collapse_close_timepoints(
+            df_diff.drop(index=idx_to_remove), time_threshold=time_threshold
+        )
+
+    def _is_cog_decline1(df: pd.DataFrame) -> tuple[bool, dict]:
         if df.index.name != col_participant_id:
             df = df.set_index(col_participant_id)
 
@@ -97,48 +134,109 @@ def _is_cog_decline(
         df = df.reset_index()
         df.index = df_diff.index
 
-        df_diff = df_diff.query(f"{col_age} >= 0.5").copy()
+        df_diff = collapse_close_timepoints(df_diff)
         if df_diff.dropna().empty:
-            return pd.NA
-        df_diff[col_rate] = df_diff[col_score] / df_diff[col_age]
+            return pd.NA, {}
+        df_diff[COL_RATE] = df_diff[col_score] / df_diff[col_age]
 
         # outlier(s): +2/year (improvement)
-        if df_diff[col_rate].max() >= 2:
+        if df_diff[COL_RATE].max() >= 2:
             # find the index of the first outlier diff
             # remove the higher (second) value
             outlier_idx = df_diff.query(
-                f"{col_rate} == {df_diff[col_rate].max()}"
+                f"{COL_RATE} == {df_diff[COL_RATE].max()}"
             ).index[0]
             df_subset = df.drop(index=outlier_idx)
             return _is_cog_decline1(df_subset)
         else:
-            return (df_diff[col_rate] <= -1).any() and (
+            return (df_diff[COL_RATE] <= -1).any() and (
                 min(df[col_score].iloc[1:] - df[col_score].iloc[0]) <= -2
             )
 
-    def _is_cog_decline2(df: pd.DataFrame) -> bool:
-        if len(df) < 2 or (df[col_age] - df[col_age].min()).max() < 0.5:
-            return pd.NA
+    def _is_cog_decline2(df: pd.DataFrame) -> tuple[bool, dict]:
+        if len(df) < 2 or (df[col_age] - df[col_age].min()).max() < TIME_THRESHOLD:
+            return pd.NA, {}
         ages = df[col_age]
         scores = df[col_score]
         slope = np.polyfit(ages, scores, 1)[0]
+
         return slope <= -1
 
-    def _is_cog_decline3(df: pd.DataFrame) -> bool:
+    def _is_cog_decline3(df: pd.DataFrame) -> tuple[bool, dict]:
         # diff between BL and any follow-up <= -3
         if len(df) < 2:
-            return pd.NA
+            return pd.NA, {}
         df_diff = df.iloc[1:] - df.iloc[0]
+
         if df_diff[col_score].isnull().all():
-            return pd.NA
+            return pd.NA, {}
         return df_diff[col_score].min() <= -3
+
+    def _is_cog_decline4(df: pd.DataFrame) -> tuple[bool, dict]:
+        df_diff = df.diff().reset_index()
+        df = df.reset_index()
+        df.index = df_diff.index
+
+        df_diff = collapse_close_timepoints(df_diff)
+        if df_diff.dropna().empty:
+            return pd.NA, {}
+        df_diff[COL_RATE] = df_diff[col_score] / df_diff[col_age]
+
+        median_rate = df_diff[COL_RATE].median()
+        cog_decline_status = median_rate <= -1
+
+        return cog_decline_status
+
+    def _is_cog_decline5(df: pd.DataFrame) -> tuple[bool, dict]:
+        df_diff = df.diff().reset_index()
+        df = df.reset_index()
+        df.index = df_diff.index
+
+        if len(df) < 2 or (df[col_age] - df[col_age].min()).max() < TIME_THRESHOLD:
+            slope = None
+        else:
+            slope = np.polyfit(df[col_age], df[col_score], 1)[0]
+
+        df_diff = collapse_close_timepoints(df_diff)
+        if df_diff.dropna().empty:
+            return pd.NA, {}
+        df_diff[COL_RATE] = df_diff[col_score] / df_diff[col_age]
+
+        min_rate_of_change = df_diff[COL_RATE].min()
+        max_rate_of_change = df_diff[COL_RATE].max()
+        net_change = df_diff[col_score].sum()
+        median_of_abs_rate_of_change = df_diff[COL_RATE].abs().median()
+
+        # monotonic changes
+        cog_decline_status = pd.NA
+        if (min_rate_of_change == 0 and max_rate_of_change == 0) or (
+            min_rate_of_change >= 0 and max_rate_of_change >= 0
+        ):
+            cog_decline_status = False
+        elif min_rate_of_change <= 0 and max_rate_of_change <= 0:
+            cog_decline_status = net_change <= -2
+        # ups and downs
+        else:
+            if slope <= -1:
+                cog_decline_status = True
+            elif slope > -1 and slope < -0.75:
+                cog_decline_status = pd.NA
+            elif median_of_abs_rate_of_change < 2:
+                cog_decline_status = False
+            else:
+                cog_decline_status = pd.NA
+
+        return cog_decline_status
 
     algorithm_map = {
         1: _is_cog_decline1,
         2: _is_cog_decline2,
         3: _is_cog_decline3,
+        4: _is_cog_decline4,
+        5: _is_cog_decline5,
     }
 
+    df = df.query(f"{col_score} != 0")
     df = df.sort_values(by=col_age)
 
     if df.empty:
@@ -150,6 +248,9 @@ def _is_cog_decline(
     df = df.query(f"{col_age} <= {df[col_age].min() + 5}")
 
     if df.empty:
+        return pd.NA
+
+    if df[col_age].max() - df[col_age].min() < 1:
         return pd.NA
 
     return algorithm_map[algorithm_id](df)
