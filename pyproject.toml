@@ -104,6 +104,7 @@ dependencies = [
     "pandas",
     "python-dotenv",
     "PyYAML",
+    "rich",
     "scikit-learn",
     "scipy",
     "seaborn",
