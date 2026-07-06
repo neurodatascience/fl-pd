@@ -39,7 +39,7 @@ The instructions below assume that the working directory is the root of the Git 
 
 1. Create Fed-BioMed nodes for the individual datasets (`site1` and `site2`) and the combined one (`mega`)
 
-    ```
+    ```console
     fedbiomed component create -p demo/fedbiomed/node-site1 -c NODE -n site1
     fedbiomed component create -p demo/fedbiomed/node-site2 -c NODE -n site2
     fedbiomed component create -p demo/fedbiomed/node-mega -c NODE -n mega
@@ -47,11 +47,13 @@ The instructions below assume that the working directory is the root of the Git 
 
 2. Add the datasets to the Fed-BioMed nodes
 
-    ```
+    ```console
     # site1
     fedbiomed node -p demo/fedbiomed/node-site1 dataset add --file demo/fedbiomed/config-site1.json
+
     # site2
     fedbiomed node -p demo/fedbiomed/node-site2 dataset add --file demo/fedbiomed/config-site2.json
+
     # mega (one file per prediction task)
     fedbiomed node -p demo/fedbiomed/node-mega dataset add --file demo/fedbiomed/config-mega_site1_site2-nb:Diagnosis.json
     fedbiomed node -p demo/fedbiomed/node-mega dataset add --file demo/fedbiomed/config-mega_site1_site2-nb:Age.json
@@ -60,26 +62,27 @@ The instructions below assume that the working directory is the root of the Git 
 
 3. Start the Fed-BioMed nodes (in different Terminal tabs)
 
-    ```
+    ```console
     fedbiomed node -p demo/fedbiomed/node-site1 start
     ```
 
-    ```
+    ```console
     fedbiomed node -p demo/fedbiomed/node-site2 start
     ```
 
-    ```
+    ```console
     fedbiomed node -p demo/fedbiomed/node-mega start
     ```
 
-4. Run the experiments:
+4. Run the experiments (takes less than one minute per task with `--sloppy`):
 
-    ```
+    ```console
     # diagnosis
     ./scripts/run_fedbiomed_custom_dataset.py demo/data ./demo/results demo/fedbiomed demo/data/latest/_stats --tag-mega 'mega_site1_site2' --train-dataset site1 --train-dataset site2 --test-dataset site1 --test-dataset site2 --n-splits 2 --n-null 1 --sloppy --target 'nb:Diagnosis' 
+
     # age
-    ./scripts/run_fedbiomed_custom_dataset.py demo/data ./demo/results demo/fedbiomed demo/data/latest/_stats --tag-mega 'mega_site1_site2' --train-dataset site1 --train-dataset site2 --test-dataset site1 --test-dataset site2 --n-splits 2 --n-null 1 --sloppy --target 'nb:Age' 
+    ./scripts/run_fedbiomed_custom_dataset.py demo/data ./demo/results demo/fedbiomed demo/data/latest/_stats --tag-mega 'mega_site1_site2' --train-dataset site1 --train-dataset site2 --test-dataset site1 --test-dataset site2 --n-splits 2 --n-null 1 --sloppy --target 'nb:Age'
+
     # cognitive decline
     ./scripts/run_fedbiomed_custom_dataset.py demo/data ./demo/results demo/fedbiomed demo/data/latest/_stats --tag-mega 'mega_site1_site2' --train-dataset site1 --train-dataset site2 --test-dataset site1 --test-dataset site2 --n-splits 2 --n-null 1 --sloppy --target 'fl:cognitive_decline_status' 
     ```
-
