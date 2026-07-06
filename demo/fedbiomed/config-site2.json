@@ -1,0 +1,7 @@
+{
+    "path": "../../../demo/data/latest/site2",
+    "data_type": "custom",
+    "description": "",
+    "tags": "site2,federated,nb:Age,nb:Diagnosis,fl:cognitive_decline_status",
+    "name": "site2"
+}

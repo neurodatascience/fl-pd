@@ -1,0 +1,8 @@
+{
+    "CUSTOM": {
+        "FL_PD": {
+            "SINGLE_SESSION": "1",
+            "STATS": "demo/data/latest/_stats"
+        }
+    }
+}
